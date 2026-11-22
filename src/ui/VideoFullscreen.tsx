@@ -3,7 +3,7 @@ import { VideoView } from 'expo-video';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 import { StyleSheet } from 'react-native-unistyles';
 import { useNavigation } from 'expo-router';
 import { create } from 'zustand';
@@ -170,7 +170,7 @@ export function VideoFullscreen({ onClose }: { onClose: () => void }) {
               onPress={act(() => setVideoFit(nextFit(fitPref)))}
               accessibilityRole="button"
               accessibilityLabel={`Picture: ${FIT_LABEL[fitPref]}${fitPref === 'auto' ? ` (${FIT_LABEL[fit]})` : ''}. Tap to change`}>
-              <SymbolView name={FIT_ICON[fitPref]} size={16} tintColor="#fff" />
+              <Icon name={FIT_ICON[fitPref]} size={16} tintColor="#fff" />
               <Text style={styles.fitText}>{FIT_LABEL[fitPref]}</Text>
             </Pressable>
             {hasLyrics ? <IconButton name="quote.bubble" size={22} color="#fff" active={showLyrics} label={showLyrics ? 'Hide lyrics' : 'Show lyrics'} onPress={act(() => setShowLyrics((v) => !v))} /> : <View style={{ width: 22 }} />}

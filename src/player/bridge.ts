@@ -2,6 +2,7 @@ import { TrackPlayer } from 'react-native-nitro-player';
 // Not part of the package's public API; the hooks are React-only and a CarPlay-only launch has no React tree.
 import { callbackManager } from 'react-native-nitro-player/src/hooks/callbackManager';
 
+import { adoptIfFromCar } from '../androidauto';
 import { log, logWarn } from '../util/log';
 import { intent } from './intent';
 import { markPlaying, onPlaybackFailed, markSkipStart, onFirstAudio, onNativeFailedAdvance, onNativeTrackChanged, userMovedRecently, onQueueEnded, onUnexpectedPause, persistNow, waitingWithLoader } from './queue';
@@ -38,6 +39,7 @@ export function startPlayerBridge(): void {
     baseline = curPos; // position of the previous track; ignore it until it moves
     curPos = 0;
     if (remoteRoute.handlers) return;
+    adoptIfFromCar(track.id); // Android Auto started this from one of its lists: the list becomes the queue (no-op elsewhere)
     // nitro-player reports every item change as "skip". A move nobody asked for, away from a song that had not reached its
     // end and either never made a sound or just reported an error, is AVQueuePlayer moving past a failed item.
     const prevDur = prev ? (playerState().queue.find((t) => t.id === prev)?.durationSec ?? 0) : 0;

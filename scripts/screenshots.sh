@@ -28,7 +28,7 @@ echo "screenshots from $(git log --oneline -1)"
 export SANGEET_FREE_TEAM=1 SANGEET_SCREENSHOTS=1 SANGEET_APPLE_TEAM=
 stamp() { cat package-lock.json | shasum | cut -c1-16; }
 native() {
-  { cat package-lock.json app.config.ts; find plugins patches -type f 2>/dev/null | sort | xargs cat 2>/dev/null;
+  { cat package-lock.json app.config.ts; node -p "require('./package.json').version"; find plugins patches -type f 2>/dev/null | sort | xargs cat 2>/dev/null;
     find modules -type f \( -path "*/ios/*" -o -path "*/android/*" -o -name "expo-module.config.json" -o -name "plugin*" -o -name "app.plugin.js" \) \
       -not -path "*/build/*" -not -path "*/.gradle/*" | sort | xargs cat 2>/dev/null
     echo "screenshots sim $SANGEET_BUNDLE_ID"; } | shasum | cut -c1-16

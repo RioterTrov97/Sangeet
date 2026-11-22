@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 import { Alert, Share } from 'react-native';
 
 import { removeAutoCached, isAutoCached, autoCachedTracks } from '../downloads/autoCache';
@@ -36,6 +36,7 @@ import type { Artwork, MusicItem, Track } from '../youtube/models';
 import { itemSubtitle, itemTitle } from './itemText';
 import { openAlbum, openArtist } from './nav';
 import { confirmAction, openActionSheet, type SheetAction, type SheetHeader, type SheetPage } from './sheet';
+import { DEVICE, FILES_NOTE, FROM_FILES, ON_THIS_DEVICE } from '../local/wording';
 
 /** Anything a Library / Search row can be: a YT item, a local playlist, or the two built-in tiles. */
 export type Entry = MusicItem | { kind: 'local'; pl: LocalPlaylist } | { kind: 'liked' } | { kind: 'downloads' } | { kind: 'device' };
@@ -43,7 +44,7 @@ export type Entry = MusicItem | { kind: 'local'; pl: LocalPlaylist } | { kind: '
 export const entryKey = (e: Entry): string => (e.kind === 'local' ? `local-${e.pl.id}` : e.kind === 'liked' || e.kind === 'downloads' || e.kind === 'device' ? e.kind : `${e.kind}-${e.id}`);
 /** The player `source` string playTracks is started with for this entry (what "current source" compares against). */
 export const entrySource = (e: Entry): string => (e.kind === 'local' ? `local:${e.pl.id}` : e.kind === 'liked' || e.kind === 'downloads' || e.kind === 'device' ? e.kind : `${e.kind}:${e.id}`);
-export const entryTitle = (e: Entry): string => (e.kind === 'local' ? e.pl.name : e.kind === 'liked' ? 'Liked Songs' : e.kind === 'downloads' ? 'Downloads' : e.kind === 'device' ? 'On this iPhone' : itemTitle(e));
+export const entryTitle = (e: Entry): string => (e.kind === 'local' ? e.pl.name : e.kind === 'liked' ? 'Liked Songs' : e.kind === 'downloads' ? 'Downloads' : e.kind === 'device' ? ON_THIS_DEVICE : itemTitle(e));
 
 const MAX_PLAYLIST_TRACKS = 500;
 
@@ -99,7 +100,7 @@ const hasDownloads = (e: Entry): boolean => {
 const downloadAll = (e: Entry) =>
   withTracks(e, (all) => {
     const tracks = all.filter((t) => !isLocalId(t.id)); // songs from this iPhone are already on it
-    if (!tracks.length) return void showNotice('Already on this iPhone');
+    if (!tracks.length) return void showNotice(`Already on this ${DEVICE}`);
     downloadTracks(tracks, groupOf(e));
     showNotice(`Downloading ${tracks.length} song${tracks.length === 1 ? '' : 's'}`);
   });
@@ -129,7 +130,7 @@ const share = (e: Entry) => {
 
 const gradientTile = (icon: 'heart.fill' | 'arrow.down.circle.fill' | 'iphone', colors: [string, string]) => (
   <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 56, height: 56, alignItems: 'center', justifyContent: 'center' }}>
-    <SymbolView name={icon} size={24} tintColor="#fff" />
+    <Icon name={icon} size={24} tintColor="#fff" />
   </LinearGradient>
 );
 
@@ -137,7 +138,7 @@ export function entryHeader(e: Entry): SheetHeader {
   switch (e.kind) {
     case 'liked': return { title: 'Liked Songs', subtitle: `Playlist • ${libraryState().liked.length} songs`, tile: gradientTile('heart.fill', ['#4500F5', '#8E8CF5']) };
     case 'downloads': return { title: 'Downloads', subtitle: 'Songs saved on this device', tile: gradientTile('arrow.down.circle.fill', ['#1f6f43', '#1ED760']) };
-    case 'device': return { title: 'On this iPhone', subtitle: `${localTracks().length} songs from Files`, tile: gradientTile('iphone', ['#33415C', '#7D8CC4']) };
+    case 'device': return { title: ON_THIS_DEVICE, subtitle: `${localTracks().length} ${FROM_FILES}`, tile: gradientTile('iphone', ['#33415C', '#7D8CC4']) };
     case 'local': return { title: e.pl.name, subtitle: `Playlist • ${e.pl.count} song${e.pl.count === 1 ? '' : 's'}`, art: e.pl.art[0] as Artwork[] | undefined };
     default: return { title: itemTitle(e), subtitle: itemSubtitle(e), art: e.artwork, round: e.kind === 'artist' };
   }
@@ -217,10 +218,10 @@ export function trackActions(track: Track): SheetAction[] {
       ? [
           confirmAction({
             id: 'rmlocal',
-            label: 'Delete from iPhone',
+            label: `Delete from ${DEVICE}`,
             icon: 'trash',
             title: `Delete "${track.title}"?`,
-            text: 'The audio file is deleted from this iPhone (Sangeet folder in Files). This cannot be undone.',
+            text: FILES_NOTE,
             confirmLabel: 'Delete',
             onConfirm: () => {
               if (isLiked(track.id)) toggleLike(track);

@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 import { Pressable, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -20,7 +20,7 @@ export function AvatarMenu() {
         subtitle: signedIn ? 'Signed in' : 'Sign in for your own library',
         tile: (
           <View style={styles.headTile}>
-            <SymbolView name="person.fill" size={26} tintColor={theme.colors.text} />
+            <Icon name="person.fill" size={26} tintColor={theme.colors.text} />
           </View>
         ),
       },
@@ -36,7 +36,7 @@ export function AvatarMenu() {
   return (
     <Pressable onPress={open} accessibilityRole="button" accessibilityLabel={signedIn ? 'Account menu' : 'Menu: settings, history, downloads, sign in'}>
       <View style={styles.avatar}>
-        <SymbolView name="person.fill" size={18} tintColor={theme.colors.text} />
+        <Icon name="person.fill" size={18} tintColor={theme.colors.text} />
       </View>
     </Pressable>
   );
@@ -47,7 +47,7 @@ export function HistoryButton() {
   const { theme } = useUnistyles();
   return (
     <Pressable style={styles.avatar} onPress={() => router.push('/history' as never)} accessibilityRole="button" accessibilityLabel="History">
-      <SymbolView name="clock" size={18} tintColor={theme.colors.text} />
+      <Icon name="clock" size={18} tintColor={theme.colors.text} />
     </Pressable>
   );
 }
@@ -57,7 +57,7 @@ export function SettingsButton() {
   const { theme } = useUnistyles();
   return (
     <Pressable style={styles.avatar} onPress={() => router.push('/settings')} accessibilityRole="button" accessibilityLabel="Settings">
-      <SymbolView name="gearshape" size={18} tintColor={theme.colors.text} />
+      <Icon name="gearshape" size={18} tintColor={theme.colors.text} />
     </Pressable>
   );
 }

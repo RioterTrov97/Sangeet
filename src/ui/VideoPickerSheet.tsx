@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -68,11 +68,11 @@ function Row({ r, onPress }: { r: PickerRow; onPress: () => void }) {
           <Text style={styles.meta} numberOfLines={1}>
             {meta}
           </Text>
-          {r.verified ? <SymbolView name="checkmark.seal.fill" size={12} tintColor={theme.colors.textSecondary} /> : null}
+          {r.verified ? <Icon name="checkmark.seal.fill" size={12} tintColor={theme.colors.textSecondary} /> : null}
         </View>
         <Text style={[styles.badge, r.badge === 'Music video' && { color: theme.colors.accent }]}>{r.badge}</Text>
       </View>
-      {r.current ? <SymbolView name="checkmark" size={16} tintColor={theme.colors.accent} /> : null}
+      {r.current ? <Icon name="checkmark" size={16} tintColor={theme.colors.accent} /> : null}
     </Pressable>
   );
 }
@@ -81,9 +81,9 @@ function Action({ icon, label, onPress, checked }: { icon: 'video.slash' | 'arro
   const { theme } = useUnistyles();
   return (
     <Pressable style={({ pressed }) => [styles.action, pressed && { opacity: 0.7 }]} onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
-      <SymbolView name={icon} size={20} tintColor={theme.colors.accent} style={styles.icon} />
+      <Icon name={icon} size={20} tintColor={theme.colors.accent} style={styles.icon} />
       <Text style={styles.actionText}>{label}</Text>
-      {checked ? <SymbolView name="checkmark" size={16} tintColor={theme.colors.accent} /> : null}
+      {checked ? <Icon name="checkmark" size={16} tintColor={theme.colors.accent} /> : null}
     </Pressable>
   );
 }

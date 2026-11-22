@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useEffect, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, View, type StyleProp, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, Platform, View, type StyleProp, type ViewStyle } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { usePalette } from './palette/store';
@@ -41,7 +41,8 @@ export function Glass({ children, style, radius = 22, tint, interactive, intensi
   const palette = usePalette();
   const tintColor = tint ?? palette.glassTint;
   const base = [styles.base, { borderRadius: radius }, style];
-  if (reduce) return <View style={[base, { backgroundColor: solid ?? theme.colors.surfaceElevated }]}>{children}</View>;
+  // Android has no live blur behind a view: a translucent layer would just show list text through the bar, so use a solid surface.
+  if (reduce || Platform.OS === 'android') return <View style={[base, { backgroundColor: solid ?? theme.colors.surfaceElevated }]}>{children}</View>;
   if (hasLiquid()) {
     return (
       <GlassView glassEffectStyle="regular" tintColor={tintColor} isInteractive={interactive} colorScheme="dark" style={base}>

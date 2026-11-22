@@ -8,6 +8,7 @@ import { disableAutoCache, savedArtworkUrl, startAutoCache } from './downloads/a
 import { setSavedArtwork } from './ui/palette/extract';
 import { clearDownloadsIfAny, startDownloads } from './downloads/manager';
 import { startNet } from './downloads/net';
+import { setupAndroidAuto } from './androidauto';
 import { setupCarPlay } from './carplay';
 import { setLyricsSidecar } from './lyrics';
 import { startLyricsPrefetch } from './lyrics/prefetch';
@@ -17,6 +18,7 @@ import { startPaletteSync } from './ui/palette/store';
 import { startVideoController } from './video/controller';
 import { startNowPlayingButtons } from './player/nowPlayingButtons';
 import { startPlayerBridge } from './player/bridge';
+import { startNotificationPermission } from './player/notifyPermission';
 import { ensurePlayerReady, restoreAtLaunch, restoreQueue, startPersisting } from './player/queue';
 import { Platform } from 'react-native';
 import { startDiscovery } from './remote/phone';
@@ -35,6 +37,7 @@ void restoreQueryCache();
 startPlayerBridge();
 startPersisting();
 startNowPlayingButtons();
+startNotificationPermission();
 startLyricsPrefetch();
 startPaletteSync();
 startSiri();
@@ -55,8 +58,9 @@ void initAuth();
 void loadServerConfig();
 startHealthChecks(resolver);
 setupCarPlay();
+setupAndroidAuto();
 // Phone: watch for Sangeet TVs on the network (the TV button only appears once one is found).
-if (Platform.OS === 'ios') startDiscovery();
+if (Platform.OS === 'ios' || (Platform.OS === 'android' && !Platform.isTV)) startDiscovery();
 ensurePlayerReady()
   .then(() => (Platform.isTV ? restoreQueue() : restoreAtLaunch()))
   .then((restored) => log('boot', `player ready, queue restored=${restored}`))

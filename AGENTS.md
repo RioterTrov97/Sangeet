@@ -18,16 +18,17 @@ Guidance for AI coding agents (and humans) working in this repo. Read this first
 
 ## Project shape
 
-One Expo (SDK 58, Continuous Native Generation) + React Native 0.88 + TypeScript codebase, two apps:
+One Expo (SDK 58, Continuous Native Generation) + React Native 0.88 + TypeScript codebase, three targets, two apps (one Android APK covers the phone and the TV):
 
 | Target | UI code | Selected by |
 | --- | --- | --- |
 | iPhone app (CarPlay, Siri) | `app/` (expo-router screens) + `src/ui/` | default |
+| Android phone app (Android Auto) | `app/` + `src/ui/`, with `Platform.OS === 'android'` gates | default, on a phone |
 | Android TV app | `src/tv/` | `Platform.isTV` |
 
 Everything else in `src/` is shared: `player/` (queue, playback intent), `youtube/` (API, stream resolver,
 extractor), `db/` (SQLite library), `downloads/`, `lyrics/`, `video/`, `library/`, `remote/` (phone → TV
-protocol), `carplay/`, `local/` (files from this iPhone), `import/`, `util/`. See the folder table in
+protocol), `carplay/`, `androidauto/` (Android Auto browse tree), `link/` (shared YouTube / Spotify link parsing and playing), `update/` (Android in-app updater), `local/` (songs from this phone), `import/`, `util/`. See the folder table in
 docs/STATUS.md.
 
 ## Where things go
@@ -55,6 +56,8 @@ docs/STATUS.md.
    adding one.
 2. Make the smallest change that does the job, in the folders above. Match the surrounding style.
 3. Add or update unit tests next to the logic you changed (Jest, `*.test.ts`).
+   For a user-visible change, add a changeset (`.changeset/<short-name>.md`: `"sangeet": patch|minor|major` and one
+   or two plain sentences for testers; see `.changeset/README.md`). Never edit the version or CHANGELOG.md by hand.
 4. Run the gates and make them pass:
    ```sh
    npx tsc --noEmit && npx eslint src app && npx jest
@@ -75,8 +78,63 @@ docs/STATUS.md.
 - The real TV (Google TV Streamer) runs a 32-bit userspace: TV APKs must keep both ABIs.
 - `android-keystore/` and `.env.android` must never be deleted or TV updates stop installing.
 
-## Release (developer-run)
+## Release and CI (developer-run)
 
-TestFlight and App Store listing go through Fastlane: `scripts/testflight.sh [beta|build|metadata|screenshots|release-prep|certs]`.
+Versions come from changesets (see "Building a feature"). Three GitHub workflows; only Release signs or publishes:
+
+| Workflow | Runs on | Does |
+| --- | --- | --- |
+| `.github/workflows/checks.yml` | every PR and push to `main` | tsc, eslint, jest; on PRs, a warning (never a failure) when app code changes without a changeset; no secrets |
+| `.github/workflows/version.yml` | push to `main`, or by hand | pending changesets → one growing `Release vX.Y.Z` PR on `changeset-release/main` (package.json version, CHANGELOG.md, lockfile); never builds. Fails on purpose, without bumping, while main's version has no tag but an earlier release does (a failed release) |
+| `.github/workflows/release.yml` | the owner merging that PR, or the owner by hand on `main` | gates → iOS (`adhoc` to Firebase App Distribution, or `beta` to TestFlight) and the signed Android APK (`android` job: one universal APK for phones and TV, published as `sangeet-android-vX.Y.Z.apk`) → GitHub Release `vX.Y.Z` with the notes and APK. Manual `dry_run` builds and signs both apps (iOS `build_only` lane) and sends nothing |
+
+Pieces: `fastlane/Fastfile` (lanes `adhoc`, `beta`, `build_only`, `metadata`, `certs`), `scripts/testflight.sh`
+(the same lanes from a Mac), `scripts/android-tv-release.sh` (the universal Android APK, `dist/sangeet-tv.apk`), `scripts/release-notes.mjs` (CHANGELOG section),
+`scripts/ci-run.sh` and `scripts/ci-logs-encrypt.sh` (quiet logs). Secrets and setup: docs/INSTALL.md.
+
+How a release happens (what to tell the developer, and what the workflows assume):
+1. A user-visible change lands on `main` with a changeset (`.changeset/<name>.md`). Agents add the changeset; they never
+   bump `package.json` or edit `CHANGELOG.md`, and never edit the `changeset-release/main` branch or its PR.
+2. Version rebuilds the release PR from `main` on every push. The developer merges it when they want to ship.
+3. The merge starts Release (iOS Ad Hoc to Firebase, Android APK, GitHub Release `vX.Y.Z`). Phones and TVs update
+   themselves from the GitHub Release.
+
+When a release fails, the version is on `main` with no tag. The fix is to rerun Release by hand on `main` (Actions >
+Release > Run workflow), not to add changesets: Version refuses to bump past an unreleased version (red X on `main`)
+until that rerun succeeds. A rerun ships `main` as it is now; changes merged since then are in that build, and their
+changesets go into the next version. To test the pipeline (first setup, new runner, Xcode or signing change), suggest a
+manual run with `dry_run` on: it needs the same secrets, builds and signs both apps, and sends nothing to testers or to
+GitHub Releases. Agents can read run results (`gh run list`, `gh run view <id>`) but never start, rerun or cancel a
+Release run, approve the `release` environment or merge the release PR; those are the developer's.
+
+Rules for changing CI:
+- **Nothing deploys on its own.** Release runs only on `workflow_dispatch` (owner, `main`) or on the merge of the
+  release PR (`pull_request: closed`, guarded: merged, head `changeset-release/main` from this repo, merged by the owner;
+  it checks out `merge_commit_sha`). Never add a push, tag, schedule or other pull_request trigger to a workflow that
+  signs, uploads or publishes, and never loosen that guard. Jobs that read signing or upload secrets use
+  `environment: release`. Checks and Version must never receive secrets or sign anything. Workflows get the least
+  `permissions` they need (`contents: read` by default).
+- **The repo is public, so Actions logs and artifacts are public.** Run every build or upload command through
+  `scripts/ci-run.sh <name> <cmd>` (full output to a file; the log shows only summary and scrubbed error lines). Never
+  `cat`, `echo` or `set -x` anything that could hold a secret, a tester's email or device, the bundle ID or team, and
+  never print env. Put the useful facts in `$GITHUB_STEP_SUMMARY` (version, build, where it went, hashes) instead.
+- **Artifacts:** never upload an IPA, a keystore, a key, an env file or a raw log. Full logs go up only through
+  `scripts/ci-logs-encrypt.sh` (encrypted with `CI_LOG_PASSPHRASE`). The Android APK goes only to the GitHub Release.
+- **Secrets** live only in GitHub secrets (repository or the `release` environment) and git-ignored env files. Values derived from a secret are not
+  masked automatically: mask them with `::add-mask::` before anything can print them. Decode key files into the
+  runner's temp or a git-ignored path, and delete them in an `if: always()` step.
+- Pin actions to a major version from the publisher (`actions/*`, `ruby/setup-ruby`, `maxim-lobanov/setup-xcode`); do
+  not add third-party actions that receive secrets without asking the developer.
+- Changing signing (new profiles, certificates, keystore) or adding a secret needs the developer's go-ahead.
+
+Before finishing any change, check that it leaks nothing:
+```sh
+git grep -n -i -E "BEGIN (RSA |EC )?PRIVATE KEY|AuthKey_[A-Z0-9]{10}\.p8|@gmail|@icloud|/Users/[a-z]" -- ':!*.lock' ':!package-lock.json'
+git status --short   # nothing untracked that should be ignored (env files, keys, devices.txt, logs)
+```
+
+### Local release
+
+TestFlight, Firebase and the App Store listing also run from a Mac: `scripts/testflight.sh [beta|build|adhoc|metadata|screenshots|release-prep|certs]`.
 Signing uses `match` (certificates in a private repo). Details in docs/INSTALL.md. Agents prepare changes;
 the developer runs releases.

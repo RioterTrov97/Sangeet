@@ -1,4 +1,5 @@
-import { SymbolView, type SFSymbol } from 'expo-symbols';
+import type { SFSymbol } from 'expo-symbols';
+import { Icon } from '../ui/Icon';
 import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -9,6 +10,7 @@ import { showAirPlayPicker, useAirPlay } from '../ui/RoutePicker';
 import { openCustomSheet } from '../ui/sheet';
 import { connectTv, disconnectTv, useRemote, type FoundTv } from './phone';
 
+const ANDROID = Platform.OS === 'android';
 const connect = (t: FoundTv) => void connectTv(`svc:${t.key}`, { name: t.name, tvId: t.tvId });
 
 /**
@@ -22,7 +24,7 @@ export function OutputButton({ size = 26, tint = '#FFFFFF', activeTint }: { size
   const found = useRemote((s) => s.found);
   const air = useAirPlay();
   const palette = usePalette();
-  if (Platform.OS !== 'ios') return null;
+  if (Platform.OS === 'web' || Platform.isTV) return null;
   const onTv = remoteNativeAvailable && status !== 'off';
   const route: OutputRoute = onTv ? 'tv' : air.active ? 'airplay' : 'phone';
   const kind = outputKind({ airplayAvailable: air.available, tvsFound: remoteNativeAvailable ? found.length : 0, route });
@@ -38,7 +40,7 @@ export function OutputButton({ size = 26, tint = '#FFFFFF', activeTint }: { size
     openPlayOn();
   };
 
-  const name = kind === 'airplay' ? 'AirPlay' : kind === 'tv' ? 'Sangeet TV' : 'output device';
+  const name = kind === 'airplay' ? (ANDROID ? 'Output switcher' : 'AirPlay') : kind === 'tv' ? 'Sangeet TV' : 'output device';
   return (
     <Pressable
       hitSlop={8}
@@ -46,7 +48,7 @@ export function OutputButton({ size = 26, tint = '#FFFFFF', activeTint }: { size
       accessibilityRole="button"
       accessibilityLabel={onTv ? `Playing on ${tvName}. Choose output` : `Choose ${name}`}
       style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <SymbolView name={outputIcon(kind, route)} size={size * 0.85} tintColor={route === 'phone' ? tint : (activeTint ?? palette.accent)} />
+      <Icon name={outputIcon(kind, route)} size={size * 0.85} tintColor={route === 'phone' ? tint : (activeTint ?? palette.accent)} />
     </Pressable>
   );
 }
@@ -58,7 +60,7 @@ function OutRow({ icon, title, sub, active, onPress, accessory }: { icon: SFSymb
   const color = active ? theme.colors.accent : theme.colors.text;
   return (
     <Pressable style={styles.row} onPress={onPress} disabled={!onPress} accessibilityRole="button" accessibilityLabel={sub ? `${title}, ${sub}` : title} accessibilityState={{ selected: !!active }}>
-      <View style={styles.rowIcon}>{accessory ?? <SymbolView name={icon} size={22} tintColor={active ? theme.colors.accent : theme.colors.textSecondary} />}</View>
+      <View style={styles.rowIcon}>{accessory ?? <Icon name={icon} size={22} tintColor={active ? theme.colors.accent : theme.colors.textSecondary} />}</View>
       <View style={styles.rowText}>
         <Text style={[styles.rowTitle, { color }]} numberOfLines={1}>{title}</Text>
         {sub ? <Text style={[styles.rowSub, active && { color: theme.colors.accent }]} numberOfLines={1}>{sub}</Text> : null}
@@ -74,7 +76,7 @@ function PlayOnSheet({ close }: { close: () => void }) {
   const found = useRemote((s) => s.found);
   const air = useAirPlay();
   const onTv = remoteNativeAvailable && status !== 'off';
-  const current = onTv ? { icon: 'tv.fill' as const, title: tvName ?? 'Sangeet TV', sub: 'Sangeet TV' } : air.active ? { icon: 'airplayaudio' as const, title: air.route || 'AirPlay', sub: 'AirPlay' } : { icon: 'iphone' as const, title: 'iPhone', sub: 'This device' };
+  const current = onTv ? { icon: 'tv.fill' as const, title: tvName ?? 'Sangeet TV', sub: 'Sangeet TV' } : air.active ? { icon: 'airplayaudio' as const, title: air.route || 'AirPlay', sub: 'AirPlay' } : { icon: 'iphone' as const, title: ANDROID ? 'This phone' : 'iPhone', sub: 'This device' };
   const after = (fn: () => void) => () => {
     close();
     setTimeout(fn, AIRPLAY_DELAY_MS);
@@ -84,7 +86,7 @@ function PlayOnSheet({ close }: { close: () => void }) {
       <Text style={styles.section}>Listening on</Text>
       <OutRow {...current} active />
       <Text style={styles.section}>Connect to a device</Text>
-      {(onTv || air.active) ? <OutRow icon="iphone" title="This iPhone" sub="This device" onPress={after(() => void (onTv ? disconnectTv() : undefined))} /> : null}
+      {(onTv || air.active) ? <OutRow icon="iphone" title={ANDROID ? 'This phone' : 'This iPhone'} sub="This device" onPress={after(() => void (onTv ? disconnectTv() : undefined))} /> : null}
       {found.filter((t) => !(onTv && t.name === tvName)).map((t) => (
         <OutRow key={t.key} icon="tv" title={t.name} sub="Sangeet TV" onPress={after(() => connect(t))} />
       ))}
@@ -92,8 +94,8 @@ function PlayOnSheet({ close }: { close: () => void }) {
       {air.available || air.active ? (
         <OutRow
           icon="airplayaudio"
-          title="AirPlay & Bluetooth"
-          sub="Speakers, headphones, Apple TV"
+          title={ANDROID ? 'Speakers & Bluetooth' : 'AirPlay & Bluetooth'}
+          sub={ANDROID ? 'Speakers, headphones, Cast devices' : 'Speakers, headphones, Apple TV'}
           onPress={() => {
             close();
             if (onTv) void disconnectTv();

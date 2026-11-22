@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 import { useEffect, useState } from 'react';
 import { Pressable, Share, Text, View, useWindowDimensions } from 'react-native';
 import Animated, { Extrapolation, interpolate, useAnimatedStyle } from 'react-native-reanimated';
@@ -49,7 +49,7 @@ function BackButton() {
       accessibilityLabel="Back"
       style={[styles.back, { top: insets.top + 4 }]}>
       <Glass radius={20} tint="rgba(0,0,0,0.38)" intensity={30} style={styles.backGlass}>
-        <SymbolView name="chevron.left" size={18} tintColor="#fff" />
+        <Icon name="chevron.left" size={18} tintColor="#fff" />
       </Glass>
     </Pressable>
   );
@@ -156,12 +156,12 @@ export function ArtistScreen() {
                   <Text style={[styles.followText, following ? { color: onAccent } : null]}>{following ? 'Following' : 'Follow'}</Text>
                 </Pressable>
                 <Pressable onPress={openMenu} accessibilityRole="button" accessibilityLabel="More options" style={styles.dots}>
-                  <SymbolView name="ellipsis" size={22} tintColor="#fff" />
+                  <Icon name="ellipsis" size={22} tintColor="#fff" />
                 </Pressable>
               </View>
               <View style={styles.actionsRight}>
                 <Pressable hitSlop={10} accessibilityRole="button" accessibilityLabel="Shuffle" onPress={() => { tap(); void playTracks(data.topSongs, 0, { source: src, shuffle: true }); }}>
-                  <SymbolView name="shuffle" size={24} tintColor="#fff" />
+                  <Icon name="shuffle" size={24} tintColor="#fff" />
                 </Pressable>
                 <PlayButton size={58} label="Play" fill={accent} iconColor={onAccent} onPress={() => { tap(); void playTracks(data.topSongs, 0, { source: src }); }} />
               </View>

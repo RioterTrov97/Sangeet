@@ -1,4 +1,4 @@
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 import { View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -11,7 +11,7 @@ export function PlaylistCover({ art, size }: { art: ArtworkModel[][]; size: numb
   if (!art.length) {
     return (
       <View style={[styles.empty, { width: size, height: size }]}>
-        <SymbolView name="music.note.list" size={size * 0.4} tintColor={theme.colors.textSecondary} />
+        <Icon name="music.note.list" size={size * 0.4} tintColor={theme.colors.textSecondary} />
       </View>
     );
   }

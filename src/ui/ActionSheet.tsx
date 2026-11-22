@@ -1,5 +1,5 @@
 import { BlurView } from 'expo-blur';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Dimensions, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -103,7 +103,7 @@ function SheetModal({ spec, open, onGone, inline }: { inline?: boolean; spec: No
     <>
       {page ? (
         <Pressable style={styles.back} onPress={() => setStack((s) => s.slice(0, -1))} accessibilityRole="button" accessibilityLabel="Back">
-          <SymbolView name="chevron.left" size={18} tintColor={theme.colors.text} />
+          <Icon name="chevron.left" size={18} tintColor={theme.colors.text} />
           <Text style={styles.backText}>{page.title}</Text>
         </Pressable>
       ) : null}
@@ -181,12 +181,12 @@ function Row({ action, onPress }: { action: SheetAction; onPress: () => void }) 
   const color = action.destructive ? theme.colors.error : theme.colors.text;
   return (
     <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]} onPress={onPress} accessibilityRole="button" accessibilityLabel={action.label} accessibilityState={action.checked === undefined ? undefined : { selected: action.checked }}>
-      {action.icon ? <SymbolView name={action.icon} size={20} tintColor={action.destructive ? theme.colors.error : theme.colors.accent} style={styles.icon} /> : null}
+      {action.icon ? <Icon name={action.icon} size={20} tintColor={action.destructive ? theme.colors.error : theme.colors.accent} style={styles.icon} /> : null}
       <Text style={[styles.rowText, { color }]} numberOfLines={1}>
         {action.label}
       </Text>
-      {action.checked ? <SymbolView name="checkmark" size={16} tintColor={theme.colors.accent} /> : null}
-      {action.sub ? <SymbolView name="chevron.right" size={14} tintColor={theme.colors.textSecondary} /> : null}
+      {action.checked ? <Icon name="checkmark" size={16} tintColor={theme.colors.accent} /> : null}
+      {action.sub ? <Icon name="chevron.right" size={14} tintColor={theme.colors.textSecondary} /> : null}
     </Pressable>
   );
 }

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Build a committed ref and upload it to TestFlight (internal testing), and drive the rest of the release flow.
 #   scripts/testflight.sh [ref]                 = beta: gates, build, upload, What to Test, local tag (default ref: main)
-#   scripts/testflight.sh beta|build|metadata|screenshots|release-prep [ref]
+#   scripts/testflight.sh beta|build|adhoc|metadata|screenshots|release-prep [ref]
 #   scripts/testflight.sh certs                 one-time: create/fetch the App Store signing certificate and profile with fastlane match
 #     beta          gates (SKIP_GATES=1 skips, loudly) + build + upload + tag testflight/<version>-<build>
 #     build         build the IPA only (checks signing); also DRY_RUN=1 scripts/testflight.sh
+#     adhoc         gates + register tester iPhones from Firebase + Ad Hoc build + upload to Firebase App Distribution + tag adhoc/<version>-<build>
 #     metadata      push the listing from fastlane/metadata to App Store Connect (never submits); WITH_SCREENSHOTS=1 adds screenshots
 #     screenshots   capture fastlane/screenshots/${SANGEET_LISTING_LOCALE:-en-AU} on the simulator (no Apple account needed)
 #     release-prep  screenshots, then metadata with those screenshots
@@ -16,7 +17,7 @@
 # in its own worktree (~/Library/Caches/sangeet-builds/testflight). Builds committed code only; the gates run in that worktree.
 set -euo pipefail
 CMD=beta
-case "${1:-}" in beta|build|metadata|screenshots|release-prep|certs) CMD="$1"; shift ;; esac
+case "${1:-}" in beta|build|adhoc|metadata|screenshots|release-prep|certs) CMD="$1"; shift ;; esac
 REF="${1:-main}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 ROOT="${SANGEET_BUILD_ROOT:-$HOME/Library/Caches/sangeet-builds}"
@@ -50,6 +51,8 @@ export SCREENSHOTS_PATH="$REPO/fastlane/screenshots"
 
 missing=""
 if [ "$CMD" = metadata ]; then need="ASC_KEY_ID ASC_ISSUER_ID"; else need="APPLE_TEAM ASC_KEY_ID ASC_ISSUER_ID MATCH_GIT_URL MATCH_PASSWORD"; fi
+[ "$CMD" = adhoc ] && need="$need FIREBASE_APP_ID FIREBASE_GROUPS"
+[ "$CMD" = adhoc ] && { [ -n "${FIREBASE_SERVICE_ACCOUNT_PATH:-}" ] || [ -n "${FIREBASE_SERVICE_ACCOUNT_CONTENT:-}" ] || missing="$missing FIREBASE_SERVICE_ACCOUNT_PATH(or FIREBASE_SERVICE_ACCOUNT_CONTENT)"; }
 for v in $need; do [ -n "${!v:-}" ] || missing="$missing $v"; done
 [ -n "${ASC_KEY_PATH:-}" ] || [ -n "${ASC_KEY_CONTENT:-}" ] || missing="$missing ASC_KEY_PATH(or ASC_KEY_CONTENT)"
 if [ -n "$missing" ]; then
@@ -57,6 +60,11 @@ if [ -n "$missing" ]; then
   exit 1
 fi
 if [ -n "${ASC_KEY_PATH:-}" ] && [ ! -f "$ASC_KEY_PATH" ]; then echo "error: ASC_KEY_PATH not found: $ASC_KEY_PATH" >&2; exit 1; fi
+if [ "$CMD" = adhoc ] && [ -n "${FIREBASE_SERVICE_ACCOUNT_PATH:-}" ] && [ ! -f "$FIREBASE_SERVICE_ACCOUNT_PATH" ]; then
+  echo "error: FIREBASE_SERVICE_ACCOUNT_PATH not found: $FIREBASE_SERVICE_ACCOUNT_PATH" >&2; exit 1
+fi
+# UDIDs collected by hand (git-ignored); the build runs in the worktree, so pass the main checkout's path.
+[ -z "${ADHOC_DEVICES_FILE:-}" ] && [ -f "$REPO/fastlane/devices.txt" ] && export ADHOC_DEVICES_FILE="$REPO/fastlane/devices.txt"
 
 # Gems live in the main checkout's vendor/bundle; fastlane runs from the worktree.
 export BUNDLE_GEMFILE="$REPO/Gemfile" BUNDLE_PATH="$REPO/vendor/bundle"
@@ -93,7 +101,7 @@ export SANGEET_FREE_TEAM=0 SANGEET_APPLE_TEAM="$APPLE_TEAM" SANGEET_CARPLAY="${S
 
 stamp() { cat package-lock.json | shasum | cut -c1-16; }
 native() {
-  { cat package-lock.json app.config.ts; find plugins patches -type f 2>/dev/null | sort | xargs cat 2>/dev/null;
+  { cat package-lock.json app.config.ts; node -p "require('./package.json').version"; find plugins patches -type f 2>/dev/null | sort | xargs cat 2>/dev/null;
     find modules -type f \( -path "*/ios/*" -o -path "*/android/*" -o -name "expo-module.config.json" -o -name "plugin*" -o -name "app.plugin.js" \) \
       -not -path "*/build/*" -not -path "*/.gradle/*" | sort | xargs cat 2>/dev/null
     echo "testflight $SANGEET_FREE_TEAM $SANGEET_CARPLAY $APPLE_TEAM $SANGEET_BUNDLE_ID"; } | shasum | cut -c1-16
@@ -112,11 +120,17 @@ fi
 native > .stamp-native-testflight
 
 LANE=beta; { [ "${DRY_RUN:-0}" = 1 ] || [ "$CMD" = build ]; } && LANE=build_only
-[ "$LANE" = beta ] && [ "${SKIP_GATES:-0}" = 1 ] && echo "WARNING: SKIP_GATES=1, shipping without tsc, eslint and jest" >&2
+[ "$CMD" = adhoc ] && LANE=adhoc
+[ "$LANE" != build_only ] && [ "${SKIP_GATES:-0}" = 1 ] && echo "WARNING: SKIP_GATES=1, shipping without tsc, eslint and jest" >&2
 [ "$LANE" = beta ] && echo "beta: gates, build, upload, then waiting (up to 1 h) for Apple to process the build so What to Test can be set"
 rm -f build-number.txt
 bundle exec fastlane ios "$LANE" >fastlane.log 2>&1 \
   || { grep -E "error|\[!\]|failed|Gates" fastlane.log | tail -20; echo "full log: $W/fastlane.log" >&2; exit 1; }
 echo "build ${LANE} done in $((SECONDS - T0)) s: version/build $(cat build-number.txt 2>/dev/null)"
+if [ "$LANE" = adhoc ]; then
+  echo "IPA: $W/build/adhoc/Sangeet.ipa"
+  echo "uploaded to Firebase App Distribution ($FIREBASE_GROUPS); tagged adhoc/$(cat build-number.txt | sed 's/ (/-/; s/)//') locally, not pushed"
+  exit 0
+fi
 echo "IPA: $W/build/testflight/Sangeet.ipa"
 if [ "$LANE" = beta ]; then echo "uploaded to TestFlight with What to Test (build/testflight/changelog.txt); tagged testflight/$(cat build-number.txt | sed 's/ (/-/; s/)//') locally, not pushed"; fi

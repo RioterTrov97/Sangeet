@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { StyleSheet } from 'react-native-unistyles';
 
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 
 import { skipNext, togglePlay, useLoading, useNowPlaying, useProgress } from '../player';
 import { Artwork } from './Artwork';
@@ -62,7 +62,7 @@ export function MiniPlayer({ bottomInset = false }: { bottomInset?: boolean }) {
               accessibilityRole="button"
               accessibilityLabel={loading ? 'Loading, pause' : isPlaying ? 'Pause' : 'Play'}
               style={[styles.play, { backgroundColor: palette.accent }]}>
-              {loading ? <ActivityIndicator size="small" color={palette.onAccent} /> : <SymbolView name={isPlaying ? 'pause.fill' : 'play.fill'} size={18} tintColor={palette.onAccent} />}
+              {loading ? <ActivityIndicator size="small" color={palette.onAccent} /> : <Icon name={isPlaying ? 'pause.fill' : 'play.fill'} size={18} tintColor={palette.onAccent} />}
             </Pressable>
             <IconButton name="forward.fill" size={20} color="#fff" label="Next" onPress={() => { tap(); void skipNext(); }} />
           </Pressable>

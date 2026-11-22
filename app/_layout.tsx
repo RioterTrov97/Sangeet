@@ -12,7 +12,9 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { RemoteBanner } from '../src/remote/RemoteBanner';
 import { ActionSheetHost } from '../src/ui/ActionSheet';
+import { useIncomingLinks } from '../src/ui/incomingLinks';
 import { NoticeBanner } from '../src/ui/NoticeBanner';
+import { UpdateBanner, useStartUpdater } from '../src/ui/UpdateBanner';
 import { queryClient } from '../src/youtube/queryClient';
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -23,6 +25,8 @@ export default function RootLayout() {
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync().catch(() => {});
   }, [ready]);
+  useIncomingLinks();
+  useStartUpdater(ready);
   if (!ready) return null;
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#121212' }}>
@@ -49,6 +53,7 @@ export default function RootLayout() {
             <Stack.Screen name="queue" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.75, 1], sheetGrabberVisible: true, sheetCornerRadius: 24 }} />
           </Stack>
           <NoticeBanner />
+          <UpdateBanner />
           <RemoteBanner />
           <ActionSheetHost />
         </BottomSheetModalProvider>

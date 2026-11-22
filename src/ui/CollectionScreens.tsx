@@ -1,7 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, Share, Text, View } from 'react-native';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 import Animated, { Extrapolation, interpolate, useAnimatedStyle } from 'react-native-reanimated';
 import { StyleSheet } from 'react-native-unistyles';
 
@@ -156,11 +156,11 @@ function CollectionScreen(p: CollectionProps) {
                   onRetry={() => p.tracks.forEach((t) => retryDownload(t.id))}
                 />
                 <Pressable style={styles.pill} onPress={() => (tap(), setSort(sort === 'default' ? 'title' : sort === 'title' ? 'artist' : 'default'))} accessibilityRole="button" accessibilityLabel={`Sort: ${sort}`}>
-                  <SymbolView name="arrow.up.arrow.down" size={14} weight="semibold" tintColor="#fff" />
+                  <Icon name="arrow.up.arrow.down" size={14} weight="semibold" tintColor="#fff" />
                   <Text style={styles.pillText}>{sort === 'default' ? 'Sort' : sort === 'title' ? 'By title' : 'By artist'}</Text>
                 </Pressable>
                 <Pressable style={styles.pill} onPress={() => p.link && void Share.share({ message: p.link })} accessibilityRole="button" accessibilityLabel="Share">
-                  <SymbolView name="square.and.arrow.up" size={14} weight="semibold" tintColor="#fff" />
+                  <Icon name="square.and.arrow.up" size={14} weight="semibold" tintColor="#fff" />
                   <Text style={styles.pillText}>Share</Text>
                 </Pressable>
               </View>

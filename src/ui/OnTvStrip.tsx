@@ -1,5 +1,5 @@
 import type { SFSymbol } from 'expo-symbols';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
@@ -51,21 +51,21 @@ export function OnTvStrip({ color, dim, accent }: { color: string; dim: string; 
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         <Pressable onPress={() => { tap(); openLayoutChooser(st.layout); }} style={[styles.chip, styles.chipOn]} accessibilityRole="button" accessibilityLabel={`TV layout: ${st.layoutLabel}. Change`}>
-          <SymbolView name={LAYOUT_SYMBOL[st.layout]} size={16} tintColor={color} />
+          <Icon name={LAYOUT_SYMBOL[st.layout]} size={16} tintColor={color} />
           <Text style={[styles.chipText, { color }]} numberOfLines={1}>{st.layoutLabel}</Text>
-          <SymbolView name="chevron.up.chevron.down" size={10} tintColor={dim} />
+          <Icon name="chevron.up.chevron.down" size={10} tintColor={dim} />
         </Pressable>
         <View style={styles.chip}>
-          {st.video.spinner ? <ActivityIndicator size="small" color={color} /> : <SymbolView name={VIDEO_SYMBOL[st.video.icon]} size={16} tintColor={st.video.icon === 'failed' ? lostColor : st.video.icon === 'none' ? dim : color} />}
+          {st.video.spinner ? <ActivityIndicator size="small" color={color} /> : <Icon name={VIDEO_SYMBOL[st.video.icon]} size={16} tintColor={st.video.icon === 'failed' ? lostColor : st.video.icon === 'none' ? dim : color} />}
           <Text style={[styles.chipText, { color: st.video.icon === 'none' ? dim : color }]} numberOfLines={1}>{st.video.label}</Text>
         </View>
         <View style={styles.chip}>
-          {st.lyrics.spinner ? <ActivityIndicator size="small" color={color} /> : <SymbolView name={LYRICS_SYMBOL[st.lyrics.icon]} size={16} tintColor={st.lyrics.dim ? dim : st.lyrics.icon === 'unsure' ? lostColor : color} />}
+          {st.lyrics.spinner ? <ActivityIndicator size="small" color={color} /> : <Icon name={LYRICS_SYMBOL[st.lyrics.icon]} size={16} tintColor={st.lyrics.dim ? dim : st.lyrics.icon === 'unsure' ? lostColor : color} />}
           <Text style={[styles.chipText, { color: st.lyrics.dim ? dim : color }]} numberOfLines={1}>{st.lyrics.label}</Text>
         </View>
         {st.quality ? (
           <View style={styles.chip}>
-            <SymbolView name="slider.horizontal.3" size={14} tintColor={dim} />
+            <Icon name="slider.horizontal.3" size={14} tintColor={dim} />
             <Text style={[styles.chipText, { color: dim }]} numberOfLines={1}>{st.quality}</Text>
           </View>
         ) : null}

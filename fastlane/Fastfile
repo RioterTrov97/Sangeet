@@ -5,6 +5,10 @@
 #   REVIEW_LAST_NAME, REVIEW_EMAIL, REVIEW_PHONE. Optional: BETA_FEEDBACK_EMAIL, SKIP_GATES=1, WITH_SCREENSHOTS=1.
 # Signing is fastlane match (certificates and profiles encrypted in a git repo): MATCH_GIT_URL, MATCH_PASSWORD, optional
 # MATCH_GIT_BRANCH. Identity (SANGEET_BUNDLE_ID, APPLE_TEAM) comes from ENV; see .env.local.example. One-time setup: lane `certs`.
+# Ad Hoc builds (lane `adhoc`, Firebase App Distribution): FIREBASE_APP_ID, FIREBASE_GROUPS, and either
+#   FIREBASE_SERVICE_ACCOUNT_PATH (service account JSON) or FIREBASE_SERVICE_ACCOUNT_CONTENT (base64 of it).
+#   Optional RELEASE_NOTES_FILE: release notes for adhoc/beta (the Release workflow passes the CHANGELOG section).
+#   Optional ADHOC_DEVICES_FILE: extra UDIDs collected by hand (tab-separated: Device ID, Device Name, Device Platform).
 
 default_platform(:ios)
 
@@ -26,6 +30,7 @@ CHANGELOG_FILE = File.join(ROOT, "build", "testflight", "changelog.txt")
 CHANGELOG_LIMIT = 4000 # App Store Connect's limit for "What to Test"
 LISTING_LOCALE = ENV["SANGEET_LISTING_LOCALE"].to_s.empty? ? "en-AU" : ENV["SANGEET_LISTING_LOCALE"] # the App Store listing language (primary language in App Store Connect)
 LAST_UPLOAD_FILE = File.join(ROOT, "build", "testflight", "last-uploaded-build.txt") # "<version> <build>", kept between runs
+LAST_ADHOC_FILE = File.join(ROOT, "build", "adhoc", "last-adhoc-build.txt")
 
 def require_env(*keys, hint: nil)
   missing = keys.select { |k| ENV[k].to_s.empty? }
@@ -64,18 +69,35 @@ def build_changelog
   text
 end
 
+# Release notes: RELEASE_NOTES_FILE (the CHANGELOG.md section, set by the Release workflow) when given, else commit subjects.
+def release_notes
+  file = ENV["RELEASE_NOTES_FILE"].to_s
+  return build_changelog if file.empty? || !File.exist?(file)
+  text = File.read(file).strip
+  text = text[0, CHANGELOG_LIMIT - 1] + "…" if text.length > CHANGELOG_LIMIT
+  UI.message("Release notes from #{file} (#{text.length} chars)")
+  text
+end
+
 def bundle_id
   id = ENV["SANGEET_BUNDLE_ID"].to_s
   UI.user_error!("Set SANGEET_BUNDLE_ID to your real bundle ID (.env.local)") if id.empty? || id == "com.example.sangeet"
   id
 end
 
-# Signs with the match-managed App Store certificate and profile (read-only: `certs` creates them once).
-def prepare_build
+def last_build_in(file, version)
+  saved = File.exist?(file) ? File.read(file).strip.split(" ") : []
+  saved[0] == version ? saved[1].to_i : 0
+end
+
+# Signs with a match-managed profile. App Store: read-only (`certs` creates it once). Ad Hoc: the profile is created, and
+# regenerated whenever devices were registered, so it includes every registered iPhone (same distribution certificate).
+def prepare_build(type: "appstore")
   require_env("MATCH_GIT_URL", "MATCH_PASSWORD", "APPLE_TEAM", hint: "run scripts/testflight.sh certs once; see docs/INSTALL.md")
   asc_api_key
   setup_ci if ENV["CI"]
-  match(type: "appstore", readonly: true, api_key: lane_context[SharedValues::APP_STORE_CONNECT_API_KEY])
+  adhoc = type == "adhoc"
+  match(type: type, readonly: !adhoc, force_for_new_devices: adhoc, api_key: lane_context[SharedValues::APP_STORE_CONNECT_API_KEY])
   profile = lane_context[SharedValues::MATCH_PROVISIONING_PROFILE_MAPPING]
   project = "ios/Sangeet.xcodeproj"
   update_code_signing_settings(
@@ -91,9 +113,9 @@ def prepare_build
   latest = latest_testflight_build_number(version: version, initial_build_number: 0)
   # A build Apple rejected during processing never shows up in TestFlight, but its number is still used, so also go past
   # the last number this machine uploaded (LAST_UPLOAD_FILE) and an explicit SANGEET_BUILD_NUMBER override.
-  uploaded = File.exist?(LAST_UPLOAD_FILE) ? File.read(LAST_UPLOAD_FILE).strip.split(" ") : []
-  local_last = uploaded[0] == version ? uploaded[1].to_i : 0
-  build = [latest + 1, local_last + 1, ENV["SANGEET_BUILD_NUMBER"].to_i].max
+  # Ad Hoc builds also go past the last Ad Hoc number, so each Firebase release installs as an update.
+  build = [latest + 1, last_build_in(LAST_UPLOAD_FILE, version) + 1, ENV["SANGEET_BUILD_NUMBER"].to_i].max
+  build = [build, last_build_in(LAST_ADHOC_FILE, version) + 1].max if adhoc
   increment_build_number(build_number: build, xcodeproj: project)
   UI.message("Version #{version}, build #{build}")
   File.write(File.join(ROOT, "build-number.txt"), "#{version} (#{build})\n")
@@ -102,8 +124,8 @@ def prepare_build
     workspace: "ios/Sangeet.xcworkspace",
     scheme: "Sangeet",
     configuration: "Release",
-    export_method: "app-store",
-    output_directory: "build/testflight",
+    export_method: adhoc ? "ad-hoc" : "app-store",
+    output_directory: adhoc ? "build/adhoc" : "build/testflight",
     output_name: "Sangeet.ipa",
     export_options: { provisioningProfiles: profile }
   )
@@ -132,6 +154,31 @@ def listing_options(require_urls: false)
   opts[:privacy_url] = { LISTING_LOCALE => ENV["PRIVACY_URL"] } unless ENV["PRIVACY_URL"].to_s.empty?
   opts[:support_url] = { LISTING_LOCALE => ENV["SUPPORT_URL"] } unless ENV["SUPPORT_URL"].to_s.empty?
   opts
+end
+
+def firebase_credentials
+  return { service_credentials_file: ENV["FIREBASE_SERVICE_ACCOUNT_PATH"] } unless ENV["FIREBASE_SERVICE_ACCOUNT_PATH"].to_s.empty?
+  content = ENV["FIREBASE_SERVICE_ACCOUNT_CONTENT"].to_s
+  UI.user_error!("Set FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT_CONTENT") if content.empty?
+  require "base64"
+  { service_credentials_json_data: Base64.decode64(content) }
+end
+
+# Registers with Apple every iPhone that testers shared through Firebase (plus ADHOC_DEVICES_FILE). Apple counts each
+# registered iPhone against the 100-device yearly limit, so only invite people who will test.
+def register_tester_devices
+  files = []
+  fetched = File.join(ROOT, "build", "adhoc", "firebase-udids.txt")
+  FileUtils.mkdir_p(File.dirname(fetched))
+  firebase_app_distribution_get_udids(app: ENV["FIREBASE_APP_ID"], output_file: fetched, **firebase_credentials)
+  files << fetched if File.exist?(fetched)
+  manual = ENV["ADHOC_DEVICES_FILE"].to_s
+  files << manual if !manual.empty? && File.exist?(manual)
+  files.each do |f|
+    register_devices(devices_file: f, platform: "ios", api_key: lane_context[SharedValues::APP_STORE_CONNECT_API_KEY])
+  end
+  File.delete(fetched) if File.exist?(fetched)
+  UI.message("No tester devices to register yet: testers share their iPhone when they accept the Firebase invite") if files.empty?
 end
 
 def review_contact_set?
@@ -181,7 +228,7 @@ platform :ios do
       gates
     end
     version, build = prepare_build
-    changelog = build_changelog
+    changelog = release_notes
     UI.message("Uploading, then waiting for Apple to process the build (up to 1 h) so What to Test can be attached")
     opts = {
       ipa: "build/testflight/Sangeet.ipa",
@@ -197,6 +244,34 @@ platform :ios do
     tag = "testflight/#{version}-#{build}"
     sh("cd #{ROOT.shellescape} && git tag -a #{tag.shellescape} -m #{"TestFlight #{version} (#{build})".shellescape} HEAD")
     UI.success("Tagged #{tag} (local only, not pushed)")
+  end
+
+  desc "Gates, register tester iPhones from Firebase, Ad Hoc build (match adhoc), upload to Firebase App Distribution"
+  lane :adhoc do
+    require_env("FIREBASE_APP_ID", "FIREBASE_GROUPS", hint: "Firebase App Distribution; see docs/INSTALL.md")
+    firebase_credentials
+    if ENV["SKIP_GATES"] == "1"
+      UI.important("!!! SKIP_GATES=1: shipping WITHOUT tsc, eslint and jest !!!")
+    else
+      gates
+    end
+    asc_api_key
+    register_tester_devices
+    # Go past the newest Firebase release too (CI runners keep no LAST_ADHOC_FILE), so each release installs as an update.
+    latest = firebase_app_distribution_get_latest_release(app: ENV["FIREBASE_APP_ID"], **firebase_credentials)
+    ENV["SANGEET_BUILD_NUMBER"] = [ENV["SANGEET_BUILD_NUMBER"].to_i, latest[:buildVersion].to_i + 1].max.to_s if latest
+    version, build = prepare_build(type: "adhoc")
+    File.write(LAST_ADHOC_FILE, "#{version} #{build}\n")
+    firebase_app_distribution(
+      app: ENV["FIREBASE_APP_ID"],
+      ipa_path: "build/adhoc/Sangeet.ipa",
+      groups: ENV["FIREBASE_GROUPS"],
+      release_notes: release_notes,
+      **firebase_credentials
+    )
+    tag = "adhoc/#{version}-#{build}"
+    sh("cd #{ROOT.shellescape} && git tag -a #{tag.shellescape} -m #{"Ad Hoc #{version} (#{build})".shellescape} HEAD")
+    UI.success("Uploaded to Firebase group(s) #{ENV['FIREBASE_GROUPS']}; tagged #{tag} (local only, not pushed)")
   end
 
   desc "Capture App Store screenshots on the simulator into fastlane/screenshots/#{LISTING_LOCALE}"

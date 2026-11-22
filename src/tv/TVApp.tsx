@@ -30,6 +30,8 @@ import { SettingsTV } from './SettingsTV';
 import { ShelvesTV } from './ShelvesTV';
 import { tv } from './theme';
 import { ExitDialog } from './ExitDialog';
+import { UpdateDialog } from './UpdateTV';
+import { startUpdater } from '../update/store';
 import { prefetchLibraryArt } from './prefetch';
 import { backgroundPlay } from './playerPrefs';
 import { DESIGN_W, useTvWindow } from './scale';
@@ -249,6 +251,16 @@ export function TVApp() {
 
   useEffect(() => startRemoteHost(), []);
   useEffect(() => prefetchLibraryArt(), []);
+  // Update check once the UI is up (the home screen mounts with the first render); a no-op unless the build knows its releases.
+  useEffect(() => {
+    if (!loaded && !error) return;
+    let stop: (() => void) | undefined;
+    const id = setTimeout(() => (stop = startUpdater()), 4000);
+    return () => {
+      clearTimeout(id);
+      stop?.();
+    };
+  }, [loaded, error]);
   if (!loaded && !error) return null;
   const route = stack[stack.length - 1];
   setPerfScreen(route.name);
@@ -267,6 +279,7 @@ export function TVApp() {
         {full ? null : <Rail current={stack[0].name} />}
         <RemoteOverlay />
         <MirrorPublisher />
+        <UpdateDialog />
         {exitOpen ? <ExitDialog onStay={() => setExitOpen(false)} /> : null}
       </QueryClientProvider>
       </Scaled>

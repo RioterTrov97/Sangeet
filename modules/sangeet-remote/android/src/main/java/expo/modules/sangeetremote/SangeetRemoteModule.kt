@@ -5,13 +5,18 @@ import expo.modules.kotlin.modules.ModuleDefinition
 import java.security.SecureRandom
 
 /**
- * TV side of the Sangeet remote. The listener and mDNS advertisement live in [RemoteHub] (kept alive by
- * [RemoteService]); this module only attaches the JS app to it. The protocol itself lives in JS (src/remote).
+ * Sangeet remote on Android. TV side: The listener and mDNS advertisement live in [RemoteHub] (kept alive by
+ * [RemoteService]); this module only attaches the JS app to it. Phone side: [RemoteClient] (NSD discovery and the outgoing connection). The protocol itself lives in JS (src/remote).
  */
 class SangeetRemoteModule : Module() {
+  /** Phone side (discovery and outgoing connections); created on first use. */
+  private val client: RemoteClient by lazy {
+    RemoteClient(appContext.reactContext ?: throw IllegalStateException("no context")) { event, payload -> sendEvent(event, payload) }
+  }
+
   override fun definition() = ModuleDefinition {
     Name("SangeetRemote")
-    Events("onAccept", "onData", "onClose")
+    Events("onAccept", "onData", "onClose", "onOpen", "onService")
 
     OnDestroy { RemoteHub.detach() }
 
@@ -24,8 +29,11 @@ class SangeetRemoteModule : Module() {
       RemoteHub.PORT
     }
     Function("stopServer") { RemoteHub.detach() }
-    Function("send") { id: String, data: String -> RemoteHub.send(id, data) }
-    Function("close") { id: String -> RemoteHub.drop(id) }
+    Function("send") { id: String, data: String -> if (client.owns(id)) client.send(id, data) else RemoteHub.send(id, data) }
+    Function("close") { id: String -> if (client.owns(id)) client.close(id) else RemoteHub.drop(id) }
+    Function("startBrowse") { client.startBrowse() }
+    Function("stopBrowse") { client.stopBrowse() }
+    Function("connect") { target: String -> client.connect(target) }
     Function("randomHex") { bytes: Int ->
       val b = ByteArray(maxOf(1, bytes))
       SecureRandom().nextBytes(b)

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import Animated, { Easing, interpolate, runOnJS, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 
 import type { DropdownRow } from '../search/dropdown';
 
@@ -20,14 +20,14 @@ function CardRow({ row, index, onPick, onRemove, onLongPress }: { row: DropdownR
   return (
     <Animated.View style={[styles.row, style]}>
       <Pressable style={styles.rowMain} onPress={() => onPick(row.text)} onLongPress={row.kind === 'recent' ? onLongPress : undefined} accessibilityRole="button" accessibilityLabel={`Search ${row.text}`}>
-        <SymbolView name={row.kind === 'recent' ? 'clock' : 'magnifyingglass'} size={16} tintColor={theme.colors.textSecondary} />
+        <Icon name={row.kind === 'recent' ? 'clock' : 'magnifyingglass'} size={16} tintColor={theme.colors.textSecondary} />
         <Text style={styles.rowText} numberOfLines={1}>
           {row.kind === 'typed' ? `Search for "${row.text}"` : row.text}
         </Text>
       </Pressable>
       {row.kind === 'recent' ? (
         <Pressable hitSlop={8} style={styles.remove} onPress={() => onRemove(row.text)} accessibilityRole="button" accessibilityLabel={`Remove ${row.text} from recent searches`}>
-          <SymbolView name="xmark" size={14} tintColor={theme.colors.textSecondary} />
+          <Icon name="xmark" size={14} tintColor={theme.colors.textSecondary} />
         </Pressable>
       ) : null}
     </Animated.View>

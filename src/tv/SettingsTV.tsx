@@ -11,6 +11,9 @@ import { setQuality, useQuality } from '../youtube/resolver/qualitySettings';
 import { useStreamInfo } from '../youtube/resolver/streamInfo';
 import { usePlayerStore } from '../player/store';
 import { Focusable } from './ui';
+import { useCanInstallRefresh } from './UpdateTV';
+import { checkForUpdate, installNow, openInstallSettings, setAutoUpdate, updaterAvailable, useUpdate } from '../update/store';
+import { statusLine } from '../update/text';
 import { tv } from './theme';
 
 const LABELS: Record<string, string> = { lrclib: 'LRCLIB (synced lyrics)', lrcred: 'lrc.red (word and line synced)', netease: 'NetEase (synced)', ytmusic: 'YouTube Music lyrics' };
@@ -46,6 +49,40 @@ function Choice({ label, note, value, onPress }: { label: string; note?: string;
   );
 }
 
+/** An action row (OK runs it). */
+function Action({ label, note, onPress }: { label: string; note?: string; onPress: () => void }) {
+  return (
+    <Focusable onPress={onPress} label={label} style={st.item} focusedStyle={st.itemOn} scale={1.02}>
+      <View style={{ flex: 1 }}>
+        <Text style={st.itemTitle}>{label}</Text>
+        {note ? <Text style={st.itemNote}>{note}</Text> : null}
+      </View>
+    </Focusable>
+  );
+}
+
+/** Settings > Updates: only on builds that know where their releases live (see src/update/config.ts). */
+function UpdatesSection() {
+  const u = useUpdate();
+  useCanInstallRefresh();
+  const busy = u.status === 'checking' || u.status === 'downloading' || u.status === 'installing';
+  return (
+    <>
+      <Text style={st.section}>Updates</Text>
+      <View style={st.item}>
+        <View style={{ flex: 1 }}>
+          <Text style={st.itemTitle}>Version {Constants.expoConfig?.version ?? ''}</Text>
+          <Text style={st.itemNote}>{statusLine(u)}</Text>
+        </View>
+      </View>
+      <Action label="Check for updates" onPress={() => !busy && void checkForUpdate({ force: true })} />
+      {u.status === 'ready' && u.canInstall ? <Action label="Install update" note={`Version ${u.release?.version}. Sangeet restarts`} onPress={() => void installNow()} /> : null}
+      {!u.canInstall && u.release ? <Action label="Allow installs" note="Android must allow Sangeet to install apps (Install unknown apps) before it can update itself" onPress={openInstallSettings} /> : null}
+      <Toggle label="Install updates automatically" note="Downloads in the background and installs when nothing is playing" on={u.autoUpdate} onPress={() => setAutoUpdate(!u.autoUpdate)} />
+    </>
+  );
+}
+
 export function SettingsTV() {
   const q = useQuality();
   const nowId = usePlayerStore((s) => s.queue[s.index]?.id);
@@ -71,6 +108,7 @@ export function SettingsTV() {
       {sources.map((s) => (
         <Toggle key={s.id} label={LABELS[s.id] ?? s.id} note={THIRD_PARTY_SOURCES.has(s.id) ? THIRD_PARTY_NOTE : undefined} on={s.enabled} onPress={() => toggleSource(s.id)} />
       ))}
+      {updaterAvailable() ? <UpdatesSection /> : null}
       <Text style={st.about}>Sangeet {Constants.expoConfig?.version ?? ''} on Google TV</Text>
     </ScrollView>
   );

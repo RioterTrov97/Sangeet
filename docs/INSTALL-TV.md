@@ -1,6 +1,28 @@
 # Installing Sangeet on Google TV / Chromecast with Google TV
 
-The Android build of Sangeet is a TV app (D-pad UI, plays music itself). It is sideloaded with `adb`; there is no Play Store listing.
+The Android build of Sangeet shows the TV app (D-pad UI, plays music itself) on a TV. There is no Play Store listing: install a released APK with the Downloader app (no computer needed), or build and sideload it with `adb`. The same APK also installs on Android phones: see [INSTALL-ANDROID.md](./INSTALL-ANDROID.md).
+
+## Install a release with Downloader (no computer)
+
+Every GitHub Release carries the APK twice: `sangeet-android-vX.Y.Z.apk` and `sangeet-android.apk`. Releases are always
+marked latest, so this link always serves the newest one:
+
+```text
+https://github.com/<owner>/<repo>/releases/latest/download/sangeet-android.apk
+```
+
+1. On the TV, install **Downloader** (by AFTVnews) from the Play Store.
+2. Settings > Apps > Security & restrictions (Google TV: Settings > System > Privacy > Security & restrictions) >
+   **Unknown sources**: allow **Downloader**.
+3. Open Downloader and enter the link above, or a short Downloader code for it. Codes are made once at AFTVnews'
+   link shortener (`go.aftvnews.com`, free account). Because the link never changes, the code keeps working for every
+   release. A code is public: anyone who enters it gets the APK, the same as the link.
+4. Downloader fetches the APK and opens Android's installer. Choose **Install**, then **Open**. Delete the APK when
+   Downloader offers it.
+
+After that, Sangeet updates itself: Settings > Updates in the app. The first update asks once to allow **Install unknown
+apps** for Sangeet. The APK must come from the Release workflow (signed with the project key); an APK signed with a
+different key cannot update an installed one.
 
 ## 1. Build the APK (on the Mac)
 
@@ -48,6 +70,8 @@ adb shell monkey -p $SANGEET_BUNDLE_ID -c android.intent.category.LEANBACK_LAUNC
 Sangeet appears in the Google TV apps row (Apps > Sangeet, with its banner). To start it from the Mac: `adb shell monkey -p $SANGEET_BUNDLE_ID -c android.intent.category.LEANBACK_LAUNCHER 1`.
 
 ## Updating
+
+Release builds update themselves from the repository's GitHub Releases (Settings > Updates, or the "Update ready" pill on Home). The first time, Android asks you to allow Sangeet to install unknown apps: Settings > Updates > Allow installs opens that screen. After that, on Android 12 and later, updates signed with the same key may install without another prompt. Sangeet never installs while music is playing. Manual route:
 
 Rebuild and run the same `adb install -r dist/sangeet-tv.apk`. Your library (likes, history, follows) stays on the TV.
 

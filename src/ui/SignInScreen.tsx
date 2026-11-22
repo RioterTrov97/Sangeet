@@ -1,11 +1,11 @@
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Text, View } from 'react-native';
 import { WebView, type WebViewNavigation } from 'react-native-webview';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { captureCookies, completeSignIn } from '../auth/store';
-import { isMusicUrl, SAFARI_UA, SIGN_IN_URL } from '../auth/cookies';
+import { CHROME_ANDROID_UA, isMusicUrl, SAFARI_UA, SIGN_IN_URL } from '../auth/cookies';
 import { logWarn } from '../util/log';
 import { IconButton } from './Controls';
 import { Screen } from './Layout';
@@ -43,7 +43,7 @@ export function SignInScreen() {
       </View>
       <WebView
         source={{ uri: SIGN_IN_URL }}
-        userAgent={SAFARI_UA}
+        userAgent={Platform.OS === 'android' ? CHROME_ANDROID_UA : SAFARI_UA}
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         incognito={false}

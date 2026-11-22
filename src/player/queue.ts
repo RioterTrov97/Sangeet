@@ -6,6 +6,7 @@ import { downloadedTracks, localArtworkUrl, localAudioUrl, markPlayed } from '..
 import { isOffline, onNetChange } from '../downloads/net';
 import { offlineFailurePlan, offlineSongs, offlineTopUp } from '../downloads/offline';
 import { isLocalId, localSongArt, localSongUrl, localTracks } from '../local';
+import { androidAutoOn } from '../androidauto/flag';
 import { log, logWarn } from '../util/log';
 import { showNotice } from '../util/notice';
 import { getJson, setJson, storage } from '../util/storage';
@@ -105,7 +106,8 @@ export function ensurePlayerReady(): Promise<void> {
   configured ??= (async () => {
     await startProxy();
     await TrackPlayer.configure({
-      androidAutoEnabled: false,
+      // Android Auto: the browsable library (src/androidauto) on phones, unless the build switch SANGEET_ANDROID_AUTO=0 is set.
+      androidAutoEnabled: androidAutoOn,
       carPlayEnabled: true,
       showInNotification: true,
       // CarPlay Now Playing buttons (toggles). The app owns shuffle/repeat state; see nowPlayingButtons.ts.
@@ -705,6 +707,24 @@ export function restoreQueue(): Promise<boolean> {
 }
 
 /** CarPlay "Resume": plays the restored (or still-restoring) queue. */
+/** The native playlist the queue plays from (Android Auto compares it with the playlist the car started). */
+export const currentPlaylistId = (): string | undefined => playlistId;
+
+/**
+ * Android Auto started a song from one of its own native playlists (the browse tree): that playlist, at that song, becomes the
+ * queue, as if it had been played from the phone. Nothing is reloaded: the native player is already on it.
+ */
+export function adoptNativePlaylist(id: string, tracks: Track[], trackId: string, source: string, sourceName?: string): boolean {
+  const index = tracks.findIndex((t) => t.id === trackId);
+  if (index < 0) return false;
+  playlistId = id;
+  awayFrom = null;
+  userStarted = true;
+  setPlayerState({ queue: tracks, index, original: null, shuffle: false, source, sourceName, userAdded: [], position: 0, duration: tracks[index].durationSec ?? 0 });
+  afterTrackChange();
+  return true;
+}
+
 export async function resumePlayback(): Promise<boolean> {
   remoteRoute.release?.(); // CarPlay always plays locally
   await ensurePlayerReady();

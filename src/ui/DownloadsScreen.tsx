@@ -1,4 +1,4 @@
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 import { useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
@@ -66,7 +66,7 @@ export function DownloadsScreen() {
       }
       accessibilityRole="button"
       accessibilityLabel="More options for downloads">
-      <SymbolView name="ellipsis.circle" size={24} tintColor={theme.colors.text} />
+      <Icon name="ellipsis.circle" size={24} tintColor={theme.colors.text} />
     </Pressable>
   );
 
@@ -93,7 +93,7 @@ export function DownloadsScreen() {
             return (
               <Pressable style={styles.row} onPress={() => void playTracks(manual, 0, { source: 'downloads', shuffle: true })} accessibilityRole="button" accessibilityLabel="Shuffle all downloaded songs">
                 <View style={styles.shuffleIcon}>
-                  <SymbolView name="shuffle" size={22} tintColor="#000" />
+                  <Icon name="shuffle" size={22} tintColor="#000" />
                 </View>
                 <Text style={styles.rowTitle}>Shuffle all</Text>
               </Pressable>

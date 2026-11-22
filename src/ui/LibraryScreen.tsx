@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 import { memo, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
@@ -34,6 +34,7 @@ import { playSong } from './playSong';
 import { openSpotifyImport } from './SpotifyImport';
 import { EmptyState } from './States';
 import { TrackRow } from './TrackRow';
+import { DEVICE } from '../local/wording';
 
 type Filter = 'songs' | 'downloads' | 'playlists' | 'albums' | 'artists';
 const FILTERS: { key: Filter | null; label: string }[] = [
@@ -62,7 +63,7 @@ export const newPlaylist = () => Alert.prompt('New playlist', 'Give it a name', 
 export function LikedTile({ size, count }: { size: number; count: number }) {
   return (
     <LinearGradient colors={['#4500F5', '#8E8CF5']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.likedArt, { width: size, height: size }]}>
-      <SymbolView name="heart.fill" size={size * 0.4} tintColor="#fff" accessibilityLabel={`${count} liked songs`} />
+      <Icon name="heart.fill" size={size * 0.4} tintColor="#fff" accessibilityLabel={`${count} liked songs`} />
     </LinearGradient>
   );
 }
@@ -226,7 +227,7 @@ export function LibraryScreen() {
               }
               accessibilityRole="button"
               accessibilityLabel="Create or import a playlist">
-              <SymbolView name="plus" size={22} tintColor={theme.colors.text} />
+              <Icon name="plus" size={22} tintColor={theme.colors.text} />
             </Pressable>
           </>
         }
@@ -234,7 +235,7 @@ export function LibraryScreen() {
           searching ? (
             <View style={styles.searchRow}>
               <View style={styles.inputWrap}>
-                <SymbolView name="magnifyingglass" size={16} tintColor={theme.colors.textSecondary} />
+                <Icon name="magnifyingglass" size={16} tintColor={theme.colors.textSecondary} />
                 <TextInput
                   style={styles.input}
                   value={query}
@@ -249,7 +250,7 @@ export function LibraryScreen() {
                 />
                 {query ? (
                   <Pressable hitSlop={10} onPress={() => setQuery('')} accessibilityRole="button" accessibilityLabel="Clear search">
-                    <SymbolView name="xmark.circle.fill" size={16} tintColor={theme.colors.textTertiary} />
+                    <Icon name="xmark.circle.fill" size={16} tintColor={theme.colors.textTertiary} />
                   </Pressable>
                 ) : null}
               </View>
@@ -272,7 +273,7 @@ export function LibraryScreen() {
         ListHeaderComponent={
           <View style={styles.toolbar}>
             <Pressable style={styles.sort} onPress={openSort} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Sort: ${sortLabel(sort)}. Tap to change`}>
-              <SymbolView name="arrow.up.arrow.down" size={14} tintColor={theme.colors.text} />
+              <Icon name="arrow.up.arrow.down" size={14} tintColor={theme.colors.text} />
               <Text style={styles.sortText}>{sortLabel(sort)}</Text>
             </Pressable>
             {filter === 'songs' || filter === 'downloads' ? null : (
@@ -303,7 +304,7 @@ export function LibraryScreen() {
         renderItem={({ item: r }: { item: Row }) => <RowView row={r} grid={showGrid} />}
         ListEmptyComponent={
           q ? (
-            <EmptyState icon="magnifyingglass" title={`No matches for "${q}"`} body="Searches your liked songs, saved albums, playlists, artists, downloads and songs from this iPhone." />
+            <EmptyState icon="magnifyingglass" title={`No matches for "${q}"`} body={`Searches your liked songs, saved albums, playlists, artists, downloads and songs from this ${DEVICE}.`} />
           ) : filter === 'songs' ? (
             <EmptyState art="rows" icon="heart.fill" tone="liked" title="Songs you like live here" body="Tap the heart on any song to save it here." action={{ label: 'Find something to like', onPress: goSearch }} />
           ) : filter === 'downloads' ? (
@@ -321,7 +322,7 @@ function Pill({ icon, label, onPress }: { icon: 'plus' | 'square.and.arrow.down'
   const { theme } = useUnistyles();
   return (
     <Pressable style={styles.pill} onPress={onPress} accessibilityRole="button" accessibilityLabel={label === 'Import' ? 'Import from Spotify' : `New ${label.toLowerCase()}`}>
-      <SymbolView name={icon} size={16} tintColor={theme.colors.text} />
+      <Icon name={icon} size={16} tintColor={theme.colors.text} />
       <Text style={styles.pillText}>{label}</Text>
     </Pressable>
   );
@@ -352,13 +353,13 @@ function EntryArt({ entry, size }: { entry: Entry; size: number }) {
     case 'downloads':
       return (
         <View style={[styles.likedArt, { width: size, height: size, backgroundColor: theme.colors.surfaceElevated }]}>
-          <SymbolView name="arrow.down.circle" size={size * 0.4} tintColor={theme.colors.accent} />
+          <Icon name="arrow.down.circle" size={size * 0.4} tintColor={theme.colors.accent} />
         </View>
       );
     case 'device':
       return (
         <View style={[styles.likedArt, { width: size, height: size, backgroundColor: theme.colors.surfaceElevated }]}>
-          <SymbolView name="iphone" size={size * 0.4} tintColor={theme.colors.accent} />
+          <Icon name="iphone" size={size * 0.4} tintColor={theme.colors.accent} />
         </View>
       );
     case 'local': return <PlaylistCover art={entry.pl.art} size={size} />;
@@ -378,7 +379,7 @@ function PlayCircle({ entry }: { entry: Entry }) {
       onPress={() => (state ? void togglePlay() : void playEntry(entry))}
       accessibilityRole="button"
       accessibilityLabel={state === 2 ? `Pause ${entryTitle(entry)}` : `Play ${entryTitle(entry)}`}>
-      <SymbolView name={state === 2 ? 'pause.fill' : 'play.fill'} size={16} tintColor="#000" />
+      <Icon name={state === 2 ? 'pause.fill' : 'play.fill'} size={16} tintColor="#000" />
     </Pressable>
   );
 }
@@ -401,11 +402,11 @@ const RowView = memo(function RowView({ row, grid }: { row: Row; grid: boolean }
       return (
         <View style={styles.playbar}>
           <Pressable style={[styles.bigPill, styles.bigPillOn]} onPress={() => void playTracks(row.tracks, 0, { source: row.source, sourceName: row.name })} accessibilityRole="button" accessibilityLabel="Play">
-            <SymbolView name="play.fill" size={16} tintColor="#000" />
+            <Icon name="play.fill" size={16} tintColor="#000" />
             <Text style={styles.bigPillOnText}>Play</Text>
           </Pressable>
           <Pressable style={styles.bigPill} onPress={() => void playTracks(row.tracks, 0, { source: row.source, sourceName: row.name, shuffle: true })} accessibilityRole="button" accessibilityLabel="Shuffle">
-            <SymbolView name="shuffle" size={16} tintColor={theme.colors.text} />
+            <Icon name="shuffle" size={16} tintColor={theme.colors.text} />
             <Text style={styles.bigPillText}>Shuffle</Text>
           </Pressable>
         </View>
@@ -421,7 +422,7 @@ const RowView = memo(function RowView({ row, grid }: { row: Row; grid: boolean }
             </View>
             <Text style={[styles.rowTitle, e.kind === 'artist' && styles.centerText]} numberOfLines={1}>{title}</Text>
             <View style={styles.subLine}>
-              {row.pinned ? <SymbolView name="pin.fill" size={11} tintColor={theme.colors.accent} /> : null}
+              {row.pinned ? <Icon name="pin.fill" size={11} tintColor={theme.colors.accent} /> : null}
               <Text style={[styles.rowSub, styles.flex]} numberOfLines={1}>{row.sub}</Text>
             </View>
           </Pressable>
@@ -433,7 +434,7 @@ const RowView = memo(function RowView({ row, grid }: { row: Row; grid: boolean }
           <View style={styles.text}>
             <Text style={styles.rowTitle} numberOfLines={1}>{title}</Text>
             <View style={styles.subLine}>
-              {row.pinned ? <SymbolView name="pin.fill" size={11} tintColor={theme.colors.accent} /> : null}
+              {row.pinned ? <Icon name="pin.fill" size={11} tintColor={theme.colors.accent} /> : null}
               <Text style={[styles.rowSub, styles.flex]} numberOfLines={1}>{row.sub}</Text>
             </View>
           </View>

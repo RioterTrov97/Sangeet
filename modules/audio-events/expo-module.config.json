@@ -1,4 +1,5 @@
 {
-  "platforms": ["apple"],
-  "apple": { "modules": ["AudioEventsModule"] }
+  "platforms": ["apple", "android"],
+  "apple": { "modules": ["AudioEventsModule"] },
+  "android": { "modules": ["expo.modules.audioevents.AudioEventsModule"] }
 }

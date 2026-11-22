@@ -1,8 +1,8 @@
 import Constants from 'expo-constants';
 import Animated from 'react-native-reanimated';
-import { Pressable, Switch, Text, View } from 'react-native';
+import { Platform, Pressable, Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { useState } from 'react';
 
@@ -23,6 +23,7 @@ import { BackupServerNote, BackupServerSection, DegradedBanner } from './BackupS
 import { IconButton } from './Controls';
 import { useScrollY } from './scroll';
 import { Image } from 'expo-image';
+import { UpdatesNote, UpdatesSection, updatesAvailable } from './UpdatesSection';
 import { APP_ICONS, chooseIcon, currentIcon, iconsSupported } from './appIcon';
 import { setMatchColors, usePaletteStore } from './palette/store';
 import { setAllowLyric, useVideoSettings } from '../video/settings';
@@ -128,7 +129,7 @@ function QualitySection() {
   return (
     <View style={styles.about}>
       <Pills<AudioQuality> label="Audio quality" options={AUDIO_QUALITIES} labels={AUDIO_LABEL} value={q.audio} onPick={(v) => setQuality({ audio: v })} />
-      <Text style={styles.aboutText}>{now ? `Now playing: ${now}. ` : ''}iPhone plays AAC only: Maximum is the best AAC YouTube offers (usually 128 kbps, 256 kbps when available). Applies from the next song.</Text>
+      <Text style={styles.aboutText}>{now ? `Now playing: ${now}. ` : ''}{Platform.OS === 'ios' ? 'iPhone plays AAC only: Maximum is the best AAC YouTube offers (usually 128 kbps, 256 kbps when available).' : 'Maximum is the best audio YouTube offers.'} Applies from the next song.</Text>
       <Pills<VideoQuality> label="Video quality" options={VIDEO_QUALITIES} labels={VIDEO_LABEL} value={q.video} onPick={(v) => setQuality({ video: v })} />
       <Text style={styles.aboutText}>Maximum plays up to 1080p. Applies from the next video.</Text>
       <View style={styles.srcRow}>
@@ -150,7 +151,7 @@ function DownloadsSection() {
   const autoUsed = useAutoCache((s) => s.bytes);
   return (
     <View style={styles.about}>
-      <Text style={styles.aboutText}>Downloads use the Audio quality setting above (AAC on iPhone).</Text>
+      <Text style={styles.aboutText}>Downloads use the Audio quality setting above{Platform.OS === 'ios' ? ' (AAC on iPhone)' : ''}.</Text>
       <View style={styles.srcRow}>
         <Text style={styles.title}>Wi-Fi only</Text>
         <Switch value={st.wifiOnly} onValueChange={(v) => setDownloadSettings({ wifiOnly: v })} accessibilityLabel="Download on Wi-Fi only" trackColor={{ true: theme.colors.accent }} />
@@ -248,50 +249,51 @@ export function SettingsScreen() {
   const [accountOpen, setAccountOpen] = useState(true);
   const [dlOpen, setDlOpen] = useState(true);
   const [serverOpen, setServerOpen] = useState(false);
+  const [updatesOpen, setUpdatesOpen] = useState(false);
   return (
     <Screen top="header" mini>
       <Animated.ScrollView onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={[styles.content, { paddingTop: topInset }]}>
         <DegradedBanner />
         <View style={styles.row} accessible={false}>
-          <SymbolView name="waveform" size={22} tintColor={theme.colors.textSecondary} style={styles.icon} />
+          <Icon name="waveform" size={22} tintColor={theme.colors.textSecondary} style={styles.icon} />
           <Text style={styles.title}>Playback quality</Text>
         </View>
         <QualitySection />
         <View style={styles.row} accessible={false}>
-          <SymbolView name="globe" size={22} tintColor={theme.colors.textSecondary} style={styles.icon} />
+          <Icon name="globe" size={22} tintColor={theme.colors.textSecondary} style={styles.icon} />
           <Text style={styles.title}>Content language and region</Text>
         </View>
         <ContentSection />
         <Pressable style={styles.row} onPress={() => setServerOpen(!serverOpen)} accessibilityRole="button" accessibilityLabel="Backup server">
-          <SymbolView name="externaldrive.connected.to.line.below" size={22} tintColor={theme.colors.textSecondary} style={styles.icon} />
+          <Icon name="externaldrive.connected.to.line.below" size={22} tintColor={theme.colors.textSecondary} style={styles.icon} />
           <Text style={styles.title}>Backup server</Text>
           <BackupServerNote />
         </Pressable>
         {serverOpen ? <BackupServerSection /> : null}
         <Pressable style={styles.row} onPress={() => router.push('/diagnostics')} accessibilityRole="button" accessibilityLabel="Diagnostics">
-          <SymbolView name="doc.text.magnifyingglass" size={22} tintColor={theme.colors.textSecondary} style={styles.icon} />
+          <Icon name="doc.text.magnifyingglass" size={22} tintColor={theme.colors.textSecondary} style={styles.icon} />
           <Text style={styles.title}>Diagnostics</Text>
           <Text style={styles.note}>Logs, health</Text>
         </Pressable>
         <View style={styles.row} accessible={false}>
-          <SymbolView name="paintpalette" size={22} tintColor={theme.colors.textSecondary} style={styles.icon} />
+          <Icon name="paintpalette" size={22} tintColor={theme.colors.textSecondary} style={styles.icon} />
           <Text style={styles.title}>Appearance</Text>
         </View>
         <AppearanceSection />
         <Pressable style={styles.row} onPress={() => setAccountOpen(!accountOpen)} accessibilityRole="button" accessibilityLabel="Account">
-          <SymbolView name="person.crop.circle" size={22} tintColor={theme.colors.textSecondary} style={styles.icon} />
+          <Icon name="person.crop.circle" size={22} tintColor={theme.colors.textSecondary} style={styles.icon} />
           <Text style={styles.title}>Account</Text>
           <AccountNote />
         </Pressable>
         {accountOpen ? <AccountSection /> : null}
         <Pressable style={styles.row} onPress={() => setDlOpen(!dlOpen)} accessibilityRole="button" accessibilityLabel="Downloads">
-          <SymbolView name="arrow.down.circle" size={22} tintColor={theme.colors.textSecondary} style={styles.icon} />
+          <Icon name="arrow.down.circle" size={22} tintColor={theme.colors.textSecondary} style={styles.icon} />
           <Text style={styles.title}>Downloads</Text>
           <DownloadsNote />
         </Pressable>
         {dlOpen ? <DownloadsSection /> : null}
         <Pressable style={styles.row} onPress={() => setLyricsOpen(!lyricsOpen)} accessibilityRole="button" accessibilityLabel="Lyrics sources">
-          <SymbolView name="music.quarternote.3" size={22} tintColor={theme.colors.textSecondary} style={styles.icon} />
+          <Icon name="music.quarternote.3" size={22} tintColor={theme.colors.textSecondary} style={styles.icon} />
           <Text style={styles.title}>Lyrics sources</Text>
           <Text style={styles.note}>{sources.filter((x) => x.enabled).length} on</Text>
         </Pressable>
@@ -311,8 +313,18 @@ export function SettingsScreen() {
             ))}
           </View>
         ) : null}
+        {updatesAvailable() ? (
+          <>
+            <Pressable style={styles.row} onPress={() => setUpdatesOpen(!updatesOpen)} accessibilityRole="button" accessibilityLabel="Updates">
+              <Icon name="arrow.up.circle.fill" size={22} tintColor={theme.colors.textSecondary} style={styles.icon} />
+              <Text style={styles.title}>Updates</Text>
+              <UpdatesNote />
+            </Pressable>
+            {updatesOpen ? <UpdatesSection /> : null}
+          </>
+        ) : null}
         <Pressable style={styles.row} onPress={() => setAbout(!about)} accessibilityRole="button" accessibilityLabel="About and licenses">
-          <SymbolView name="info.circle" size={22} tintColor={theme.colors.textSecondary} style={styles.icon} />
+          <Icon name="info.circle" size={22} tintColor={theme.colors.textSecondary} style={styles.icon} />
           <Text style={styles.title}>About and licenses</Text>
           <Text style={styles.note}>v{Constants.expoConfig?.version ?? '0.1.0'}</Text>
         </Pressable>

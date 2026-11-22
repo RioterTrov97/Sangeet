@@ -6,6 +6,8 @@ export type CookieMap = Record<string, { value: string; domain?: string }>;
 export const SIGN_IN_URL = 'https://accounts.google.com/ServiceLogin?continue=https%3A%2F%2Fmusic.youtube.com';
 export const MUSIC_ORIGIN = 'https://music.youtube.com';
 export const SAFARI_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+/** Android: Chrome's mobile string without the "; wv" marker WebViews add, which Google's sign-in refuses. Unverified against a real account. */
+export const CHROME_ANDROID_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36';
 
 const AUTH_NAMES = ['SAPISID', '__Secure-3PAPISID'];
 

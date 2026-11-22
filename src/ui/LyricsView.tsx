@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/immutability -- Reanimated shared values are mutated by design */
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 import { Animated as RNAnimated, Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
 import Animated, { cancelAnimation, Easing, scrollTo, useAnimatedRef, useAnimatedStyle, useDerivedValue, useFrameCallback, useScrollOffset, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import { StyleSheet } from 'react-native-unistyles';
@@ -165,21 +165,21 @@ function SyncPill({ sync }: { sync: LyricsSync }) {
           {sync.ms ? (
             <RNAnimated.View style={{ opacity }} pointerEvents={mode}>
               <Pressable hitSlop={10} onPress={() => (tap(), sync.onChange(0))} accessibilityRole="button" accessibilityLabel="Reset lyrics sync">
-                <SymbolView name="xmark.circle.fill" size={13} tintColor="rgba(255,255,255,0.6)" />
+                <Icon name="xmark.circle.fill" size={13} tintColor="rgba(255,255,255,0.6)" />
               </Pressable>
             </RNAnimated.View>
           ) : null}
         </View>
         <RNAnimated.View style={{ opacity }} pointerEvents={mode}>
           <Pressable hitSlop={14} onPress={() => step(1)} accessibilityRole="button" accessibilityLabel="Lyrics earlier by half a second">
-            <SymbolView name="chevron.up" size={16} tintColor="rgba(255,255,255,0.6)" />
+            <Icon name="chevron.up" size={16} tintColor="rgba(255,255,255,0.6)" />
           </Pressable>
         </RNAnimated.View>
       </View>
       <View style={styles.syncBottom} pointerEvents="box-none">
         <RNAnimated.View style={{ opacity }} pointerEvents={mode}>
           <Pressable hitSlop={14} onPress={() => step(-1)} accessibilityRole="button" accessibilityLabel="Lyrics later by half a second">
-            <SymbolView name="chevron.down" size={16} tintColor="rgba(255,255,255,0.6)" />
+            <Icon name="chevron.down" size={16} tintColor="rgba(255,255,255,0.6)" />
           </Pressable>
         </RNAnimated.View>
       </View>

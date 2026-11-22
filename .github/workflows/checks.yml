@@ -1,0 +1,52 @@
+# Type check, lint and unit tests on every pull request and every push to main, plus a changeset reminder on pull
+# requests. No secrets, nothing is built or published, so it is safe for pull requests from forks.
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx tsc --noEmit
+      - run: npx eslint src app
+      - run: npx jest --ci
+
+  # A warning, never a failure: refactors, tests and docs need no changeset.
+  changeset:
+    if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # the PR merge commit and its base
+      - name: Changeset for app changes
+        run: |
+          changed=$(git diff --name-only HEAD^1 HEAD)
+          app=$(echo "$changed" | grep -E '^(app|src|modules|plugins|patches)/|^app\.config\.ts$' | grep -v -E '\.test\.tsx?$' || true)
+          added=$(git diff --name-only --diff-filter=AM HEAD^1 HEAD -- .changeset | grep -E '^\.changeset/.+\.md$' | grep -v README.md || true)
+          if [ -n "$app" ] && [ -z "$added" ]; then
+            msg="This PR changes app code but adds no changeset. If testers will notice the change, add one: npx changeset (see .changeset/README.md)."
+            echo "::warning::$msg"
+            { echo "### Changeset"; echo "$msg"; } >> "$GITHUB_STEP_SUMMARY"
+          elif [ -n "$added" ]; then
+            { echo "### Changeset"; echo "$added" | sed 's/^/- /'; } >> "$GITHUB_STEP_SUMMARY"
+          fi

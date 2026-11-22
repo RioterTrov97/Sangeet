@@ -1,4 +1,4 @@
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 import type { ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
@@ -72,11 +72,11 @@ export function TrackRow({ track, onPress, index, fallbackArt, showDuration = tr
           </View>
         </View>
         {dl && dl.state !== 'done' && dl.state !== 'failed' ? <ProgressRing fraction={dl.totalBytes ? dl.bytes / dl.totalBytes : 0} size={16} color={theme.colors.accent} /> : null}
-        {dl?.state === 'failed' ? <SymbolView name="exclamationmark.arrow.circlepath" size={14} tintColor={theme.colors.error} accessibilityLabel="Download failed" /> : null}
-        {liked ? <SymbolView name="heart.fill" size={14} tintColor={theme.colors.accent} /> : null}
+        {dl?.state === 'failed' ? <Icon name="exclamationmark.arrow.circlepath" size={14} tintColor={theme.colors.error} accessibilityLabel="Download failed" /> : null}
+        {liked ? <Icon name="heart.fill" size={14} tintColor={theme.colors.accent} /> : null}
         {showDuration && track.durationSec ? <Text style={styles.duration}>{formatDuration(track.durationSec)}</Text> : null}
         <Pressable style={styles.more} hitSlop={4} onPress={openSheet} accessibilityRole="button" accessibilityLabel={`More options for ${track.title}`}>
-          <SymbolView name="ellipsis" size={18} tintColor={theme.colors.textSecondary} />
+          <Icon name="ellipsis" size={18} tintColor={theme.colors.textSecondary} />
         </Pressable>
       </Pressable>
     </View>

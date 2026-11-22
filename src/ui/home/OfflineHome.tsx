@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from '../Icon';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
@@ -12,6 +12,7 @@ import type { Track } from '../../youtube/models';
 import { EMPTY_TONES, withAlpha } from '../emptyTones';
 import { playSong } from '../playSong';
 import { TrackRow } from '../TrackRow';
+import { ON_THIS_DEVICE } from '../../local/wording';
 
 /** Offline Home rows: a hero card, then short lists of downloaded and automatically saved songs. */
 export type OfflineRow =
@@ -19,7 +20,7 @@ export type OfflineRow =
   | { type: 'offlineHead'; title: string; count: number; more: boolean }
   | { type: 'offlineSong'; track: Track; list: Track[]; key: string };
 
-const DEVICE_TITLE = 'On this iPhone';
+const DEVICE_TITLE = ON_THIS_DEVICE;
 const SHOWN = { downloaded: 5, saved: 8, device: 5 };
 
 export function offlineRows(): OfflineRow[] {
@@ -68,7 +69,7 @@ function OfflineHero({ count }: { count: number }) {
     <View style={[styles.hero, { borderColor: withAlpha(TONE, 0.28), backgroundColor: withAlpha(TONE, 0.1) }]}>
       <View style={styles.heroTop}>
         <View style={[styles.icon, { backgroundColor: withAlpha(TONE, 0.2) }]}>
-          <SymbolView name="wifi.slash" size={20} tintColor={TONE} />
+          <Icon name="wifi.slash" size={20} tintColor={TONE} />
         </View>
         <View style={styles.heroText}>
           <Text style={styles.heroTitle}>{"You're offline"}</Text>
@@ -78,12 +79,12 @@ function OfflineHero({ count }: { count: number }) {
       <View style={styles.buttons}>
         {count ? (
           <Pressable style={({ pressed }) => [styles.primary, pressed && styles.pressed]} onPress={() => void playOfflineSongs()} accessibilityRole="button" accessibilityLabel="Shuffle offline songs">
-            <SymbolView name="shuffle" size={15} tintColor="#000" />
+            <Icon name="shuffle" size={15} tintColor="#000" />
             <Text style={styles.primaryText}>Shuffle offline songs</Text>
           </Pressable>
         ) : null}
         <Pressable style={({ pressed }) => [styles.secondary, pressed && styles.pressed]} onPress={() => router.push('/downloads' as never)} accessibilityRole="button" accessibilityLabel="Open downloads">
-          <SymbolView name="arrow.down.circle" size={15} tintColor="#fff" />
+          <Icon name="arrow.down.circle" size={15} tintColor="#fff" />
           <Text style={styles.secondaryText}>Downloads</Text>
         </Pressable>
       </View>

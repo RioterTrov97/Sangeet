@@ -1,4 +1,4 @@
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 import { Pressable, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { useUnistyles } from 'react-native-unistyles';
@@ -35,15 +35,15 @@ export function CollectionDownloadButton({ status, onDownload, onRemove, onRetry
     a11y = `Downloading ${label}, ${Math.round(status.fraction * 100)} percent`;
     press = () => {};
   } else if (complete) {
-    body = <SymbolView name="arrow.down.circle.fill" size={26} tintColor={tint} />;
+    body = <Icon name="arrow.down.circle.fill" size={26} tintColor={tint} />;
     a11y = `Downloaded. Remove download of ${label}`;
     press = onRemove;
   } else if (status.failed) {
-    body = <SymbolView name="exclamationmark.arrow.circlepath" size={24} tintColor={theme.colors.error} />;
+    body = <Icon name="exclamationmark.arrow.circlepath" size={24} tintColor={theme.colors.error} />;
     a11y = `Download failed. Retry ${label}`;
     press = onRetry;
   } else {
-    body = <SymbolView name="arrow.down.circle" size={26} tintColor={theme.colors.text} />;
+    body = <Icon name="arrow.down.circle" size={26} tintColor={theme.colors.text} />;
   }
   if (pill) {
     // Same glyph size and weight as the other pills (Sort, Share); the download pill stands out by colour only.
@@ -51,7 +51,7 @@ export function CollectionDownloadButton({ status, onDownload, onRemove, onRetry
     const icon = status.active ? (
       <ProgressRing fraction={status.fraction} color={tone} size={16} track={withAlpha(tone, 0.3)} />
     ) : (
-      <SymbolView name={complete ? 'checkmark' : status.failed ? 'arrow.clockwise' : 'arrow.down'} size={14} weight="semibold" tintColor={tone} />
+      <Icon name={complete ? 'checkmark' : status.failed ? 'arrow.clockwise' : 'arrow.down'} size={14} weight="semibold" tintColor={tone} />
     );
     const text = status.active ? `${Math.round(status.fraction * 100)}%` : complete ? 'Downloaded' : status.failed ? 'Retry' : pill;
     return (

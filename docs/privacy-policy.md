@@ -28,6 +28,10 @@ The app talks to the services that provide the music and the extras you ask for.
 - No data is sold, rented or shared with third parties for their own purposes.
 - No account with Sangeet exists, so there is nothing to delete on our side.
 
+## Beta testing
+
+If you test a pre-release build shared through Firebase App Distribution (a Google service), Firebase holds your email address and, once you install its profile, your iPhone's device identifier (UDID) and model. They are used only to send you invites and to register your iPhone in the developer's Apple account so the beta can install. Ask to leave the beta and you are removed from Firebase; Apple keeps registered devices until the developer membership renews. The app itself sends nothing extra in beta builds.
+
 ## Children
 
 Sangeet is not directed at children and collects no personal information from anyone.

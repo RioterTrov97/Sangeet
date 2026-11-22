@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 export type VoiceState = 'idle' | 'listening' | 'denied' | 'error';
 
 /**
- * Voice search through iOS speech recognition (on device when the language supports it). Partial transcripts go to
+ * Voice search through the system speech recognition (iOS: on device when the language supports it; Android: the system recogniser). Partial transcripts go to
  * `onPartial`; when it stops (silence or `stop()`), `onFinal` gets the last transcript. The audio session is set to mix with
  * other audio while listening and put back afterwards so music is not interrupted more than iOS requires.
  */
@@ -56,7 +56,7 @@ export function useVoiceSearch({ onPartial, onFinal }: { onPartial: (text: strin
       lang: 'en-US',
       interimResults: true,
       continuous: false,
-      requiresOnDeviceRecognition: ExpoSpeechRecognitionModule.supportsOnDeviceRecognition(),
+      requiresOnDeviceRecognition: Platform.OS === 'ios' && ExpoSpeechRecognitionModule.supportsOnDeviceRecognition(), // Android uses the system recogniser (network ok)
       iosCategory: { category: 'playAndRecord', categoryOptions: ['mixWithOthers', 'allowBluetooth', 'defaultToSpeaker'], mode: 'measurement' },
     });
   }, []);

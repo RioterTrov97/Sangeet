@@ -1,3 +1,89 @@
+diff --git a/node_modules/react-native-nitro-player/android/src/main/java/com/margelo/nitro/nitroplayer/core/NitroPlayerEvents.kt b/node_modules/react-native-nitro-player/android/src/main/java/com/margelo/nitro/nitroplayer/core/NitroPlayerEvents.kt
+new file mode 100644
+index 0000000..0eb6284
+--- /dev/null
++++ b/node_modules/react-native-nitro-player/android/src/main/java/com/margelo/nitro/nitroplayer/core/NitroPlayerEvents.kt
+@@ -0,0 +1,25 @@
++package com.margelo.nitro.nitroplayer.core
++
++import android.content.Context
++import android.content.Intent
++
++/**
++ * Sangeet patch: tells the app (modules/audio-events) what changed playback from outside, so its playback-intent
++ * watchdog does not fight a pause the user or the system caused. Package-scoped broadcast, never exported.
++ */
++internal object NitroPlayerEvents {
++    const val ACTION = "com.margelo.nitro.nitroplayer.EVENT"
++
++    fun emit(
++        context: Context,
++        type: String,
++        value: String,
++    ) {
++        try {
++            context.sendBroadcast(
++                Intent(ACTION).setPackage(context.packageName).putExtra("type", type).putExtra("value", value),
++            )
++        } catch (_: Exception) {
++        }
++    }
++}
+diff --git a/node_modules/react-native-nitro-player/android/src/main/java/com/margelo/nitro/nitroplayer/core/TrackPlayerListener.kt b/node_modules/react-native-nitro-player/android/src/main/java/com/margelo/nitro/nitroplayer/core/TrackPlayerListener.kt
+index f101d06..37d999b 100644
+--- a/node_modules/react-native-nitro-player/android/src/main/java/com/margelo/nitro/nitroplayer/core/TrackPlayerListener.kt
++++ b/node_modules/react-native-nitro-player/android/src/main/java/com/margelo/nitro/nitroplayer/core/TrackPlayerListener.kt
+@@ -140,6 +140,12 @@ internal class TrackPlayerEventListener(
+         reason: Int,
+     ) {
+         val r = if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST) Reason.USER_ACTION else null
++        // Sangeet patch: a pause or resume the system caused (call, another app taking audio, headphones unplugged).
++        if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
++            NitroPlayerEvents.emit(core.context, "interruption", if (playWhenReady) "ended" else "began")
++        } else if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY) {
++            NitroPlayerEvents.emit(core.context, "remote", "pause")
++        }
+         core.updateJsKeepAlive()
+         core.emitStateChange(r)
+     }
+diff --git a/node_modules/react-native-nitro-player/android/src/main/java/com/margelo/nitro/nitroplayer/media/MediaSessionCallbackFactory.kt b/node_modules/react-native-nitro-player/android/src/main/java/com/margelo/nitro/nitroplayer/media/MediaSessionCallbackFactory.kt
+index aebc7ae..76a641f 100644
+--- a/node_modules/react-native-nitro-player/android/src/main/java/com/margelo/nitro/nitroplayer/media/MediaSessionCallbackFactory.kt
++++ b/node_modules/react-native-nitro-player/android/src/main/java/com/margelo/nitro/nitroplayer/media/MediaSessionCallbackFactory.kt
+@@ -18,6 +18,7 @@ import com.google.common.util.concurrent.Futures
+ import com.google.common.util.concurrent.ListenableFuture
+ import com.google.common.util.concurrent.SettableFuture
+ import com.margelo.nitro.nitroplayer.TrackItem
++import com.margelo.nitro.nitroplayer.core.NitroPlayerEvents
+ import com.margelo.nitro.nitroplayer.core.NitroPlayerLogger
+ import com.margelo.nitro.nitroplayer.playlist.Playlist
+ import com.margelo.nitro.nitroplayer.playlist.PlaylistManager
+@@ -53,6 +54,25 @@ object MediaSessionCallbackFactory {
+                         MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS,
+                     ).build()
+ 
++            // Sangeet patch: report transport commands that come from outside the app (notification, lock screen, headset,
++            // Bluetooth, Android Auto). In-app controls call the player directly and never pass through here.
++            override fun onPlayerCommandRequest(
++                session: MediaSession,
++                controller: MediaSession.ControllerInfo,
++                playerCommand: Int,
++            ): Int {
++                val name =
++                    when (playerCommand) {
++                        Player.COMMAND_PLAY_PAUSE -> if (session.player.playWhenReady) "pause" else "play"
++                        Player.COMMAND_STOP -> "stop"
++                        Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> "next"
++                        Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> "previous"
++                        else -> null
++                    }
++                if (name != null) NitroPlayerEvents.emit(service.applicationContext, "remote", name)
++                return SessionResult.RESULT_SUCCESS
++            }
++
+             override fun onAddMediaItems(
+                 mediaSession: MediaSession,
+                 controller: MediaSession.ControllerInfo,
 diff --git a/node_modules/react-native-nitro-player/ios/core/TrackPlayerListener.swift b/node_modules/react-native-nitro-player/ios/core/TrackPlayerListener.swift
 index d112479..0fc6569 100644
 --- a/node_modules/react-native-nitro-player/ios/core/TrackPlayerListener.swift

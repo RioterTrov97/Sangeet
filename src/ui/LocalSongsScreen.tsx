@@ -1,4 +1,4 @@
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 import { useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -12,12 +12,13 @@ import { playSong } from './playSong';
 import { AnimatedFlashList, useScrollY } from './scroll';
 import { EmptyState } from './States';
 import { TrackRow } from './TrackRow';
+import { DEVICE, EMPTY_BODY, ON_THIS_DEVICE } from '../local/wording';
 
 type Row = { type: 'playbar' } | { type: 'import' } | { type: 'song'; track: Track };
 
 const SOURCE = 'device';
 
-/** Songs from this iPhone: imported from Files, or dropped into On My iPhone > Sangeet > Music. */
+/** Songs from this device: imported from Files (iPhone, also dropped into On My iPhone > Sangeet > Music) or picked with the document picker (Android). */
 export function LocalSongsScreen() {
   const { scrollY, onScroll } = useScrollY();
   const topInset = useScreenTop('header');
@@ -38,8 +39,8 @@ export function LocalSongsScreen() {
             art="rows"
             icon="iphone"
             tone="downloads"
-            title="No songs from this iPhone yet"
-            body="Import audio files from Files, or drop them into On My iPhone > Sangeet > Music."
+            title={`No songs from this ${DEVICE} yet`}
+            body={EMPTY_BODY}
             action={{ label: 'Import songs', onPress: () => void importSongsFromFiles() }}
           />
         }
@@ -47,12 +48,12 @@ export function LocalSongsScreen() {
           if (r.type === 'playbar')
             return (
               <View style={styles.playbar}>
-                <Pressable style={[styles.bigPill, styles.bigPillOn]} onPress={() => void playTracks(songs, 0, { source: SOURCE, sourceName: 'On this iPhone' })} accessibilityRole="button" accessibilityLabel="Play">
-                  <SymbolView name="play.fill" size={16} tintColor="#000" />
+                <Pressable style={[styles.bigPill, styles.bigPillOn]} onPress={() => void playTracks(songs, 0, { source: SOURCE, sourceName: ON_THIS_DEVICE })} accessibilityRole="button" accessibilityLabel="Play">
+                  <Icon name="play.fill" size={16} tintColor="#000" />
                   <Text style={styles.bigPillOnText}>Play</Text>
                 </Pressable>
-                <Pressable style={styles.bigPill} onPress={() => void playTracks(songs, 0, { source: SOURCE, sourceName: 'On this iPhone', shuffle: true })} accessibilityRole="button" accessibilityLabel="Shuffle">
-                  <SymbolView name="shuffle" size={16} tintColor="#fff" />
+                <Pressable style={styles.bigPill} onPress={() => void playTracks(songs, 0, { source: SOURCE, sourceName: ON_THIS_DEVICE, shuffle: true })} accessibilityRole="button" accessibilityLabel="Shuffle">
+                  <Icon name="shuffle" size={16} tintColor="#fff" />
                   <Text style={styles.bigPillText}>Shuffle</Text>
                 </Pressable>
               </View>
@@ -60,14 +61,14 @@ export function LocalSongsScreen() {
           if (r.type === 'import')
             return (
               <Pressable style={styles.import} onPress={() => void importSongsFromFiles()} accessibilityRole="button" accessibilityLabel="Import songs">
-                <SymbolView name="square.and.arrow.down" size={16} tintColor="#fff" />
+                <Icon name="square.and.arrow.down" size={16} tintColor="#fff" />
                 <Text style={styles.importText}>Import songs</Text>
               </Pressable>
             );
           return <TrackRow track={r.track} onPress={() => playSong(songs, Math.max(0, songs.findIndex((t) => t.id === r.track.id)), { source: SOURCE })} />;
         }}
       />
-      <Header title="On this iPhone" scrollY={scrollY} back inline />
+      <Header title={ON_THIS_DEVICE} scrollY={scrollY} back inline />
     </Screen>
   );
 }

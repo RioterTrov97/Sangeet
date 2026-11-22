@@ -57,7 +57,7 @@ type StreamProxyNative = {
   bgDownloadStart(id: string, spec: BgDownloadSpec): void;
   bgDownloadCancel(id: string): void;
   bgDownloadStatus(): BgDownloadStatus[];
-  /** iOS: title / artist / album / duration of a local audio file; the cover bytes are written to `artworkOut` (a path, not a uri). Android: empty. */
+  /** iOS: title / artist / album / duration of a local audio file; the cover bytes are written to `artworkOut` (a path, not a uri). Android: the same through MediaMetadataRetriever. */
   readAudioTags(path: string, artworkOut: string): Promise<AudioTags>;
   /** Loads the extractor page into the headless native WKWebView (see ExtractorWebView.swift). */
   extractorLoad(html: string, baseUrl: string): void;

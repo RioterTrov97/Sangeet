@@ -23,14 +23,17 @@ const MAX_SHOWN = 100;
 /** Library `Import` pill and + menu: opens the Spotify import sheet. */
 export const openSpotifyImport = () => openCustomSheet((close) => <ImportSheet close={close} />, { title: 'Import from Spotify' });
 
+/** The same sheet with a link already filled in (a Spotify link shared to Sangeet from another app). */
+export const openSpotifyImportFor = (link: string) => openCustomSheet((close) => <ImportSheet close={close} initial={link} />, { title: 'Import from Spotify' });
+
 async function searchSongs(q: string): Promise<Track[]> {
   const page = await search(q, 'song');
   return page.items.filter((x): x is Track => x.kind === 'track');
 }
 
-function ImportSheet({ close }: { close: () => void }) {
+function ImportSheet({ close, initial = '' }: { close: () => void; initial?: string }) {
   const { theme } = useUnistyles();
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initial);
   const [phase, setPhase] = useState<Phase>({ kind: 'input' });
   const [showSkipped, setShowSkipped] = useState(false);
   const abort = useRef<AbortController | null>(null);

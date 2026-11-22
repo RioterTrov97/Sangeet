@@ -34,6 +34,7 @@ class RemoteService : Service() {
 
   companion object {
     fun start(ctx: Context) {
+      if (!isTv(ctx)) return
       try {
         val i = Intent(ctx, RemoteService::class.java)
         if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(i) else ctx.startService(i)

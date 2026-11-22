@@ -1,6 +1,6 @@
 # Sangeet: developer reference
 
-A music player built from one Expo / React Native codebase for two targets: an iPhone app (CarPlay, Siri, phone-as-TV-remote) and an Android TV app (D-pad UI, sideloaded). Streams are resolved on the device; an optional self-hosted server is the fallback.
+A music player built from one Expo / React Native codebase for three targets: an iPhone app (CarPlay, Siri, phone-as-TV-remote), an Android phone app (the phone UI, Android Auto, phone-as-TV-remote) and an Android TV app (D-pad UI). One universal Android APK (both ABIs, one signing key) is the phone and TV app: `Platform.isTV` picks the UI (`index.ts`). Sideloaded, updates itself. Streams are resolved on the device; an optional self-hosted server is the fallback.
 
 Stack: Expo SDK 58 (Continuous Native Generation), React Native 0.88, TypeScript, `react-native-nitro-player` (AVPlayer on iOS, Media3 ExoPlayer on Android), youtubei.js in a hidden WebView extractor (PoToken, n-decipher), TanStack Query, SQLite (`src/db`), expo-video.
 
@@ -14,6 +14,7 @@ Top level: `app/` (expo-router phone screens), `src/` (all app code), `modules/`
 | --- | --- |
 | `auth` | Google sign-in cookies (keychain only) and the signed-in store |
 | `boot.ts` | Headless start-up shared by the phone UI, CarPlay and the TV |
+| `androidauto` | Android Auto browse tree (`tree.ts` pure, `index.ts` wiring); lists are native playlists named `aa:<context>`, adopted as the queue when the car plays from one (`adoptIfFromCar`). Search: the car's search button (voice while driving, keyboard when parked) and "Hey Google, play X on Sangeet" (nitro-player's voice fallback plays the first song) both use `searchResults` (top songs as one list, then albums and artists); car searches join the phone's recent searches (`search.recent`), shown under Home > Recent searches. Build switch `SANGEET_ANDROID_AUTO` (default on, `app.config.ts`) |
 | `carplay` | CarPlay templates (Home, Library, Recents, Downloads), built from cache so a cold launch works without the phone UI |
 | `db` | SQLite client, schema, migrations, repository |
 | `dev` | Dev deep-link driver (`sangeet://dev?...`) and perf driver (`sangeet://perf?on=1`); the dev driver is off in release builds except screenshot builds (`SANGEET_SCREENSHOTS=1`) |
@@ -21,13 +22,15 @@ Top level: `app/` (expo-router phone screens), `src/` (all app code), `modules/`
 | `home` | Home shelves, layout, personalisation |
 | `import` | Spotify playlist import and matching to YouTube tracks |
 | `library` | Likes, playlists, follows, pins, YouTube library sync |
-| `local` | Songs from this iPhone (`Documents/Music`): scan, tags, `local-<hash>` ids |
+| `link` | YouTube / YouTube Music link parsing (`musicLink.ts`, shared with the TV), playing a link (`playLink.ts`), shared text parsing incl. Spotify (`shared.ts`) |
+| `local` | Songs from this device (iPhone: `Documents/Music` shown in Files; Android: the document picker copies into the app's music folder): scan, tags, `local-<hash>` ids |
 | `lyrics` | Lyrics providers, parsing, timing clock, prefetch |
 | `player` | Queue, store, playback intent, recovery, history, bridge to nitro-player |
 | `remote` | Phone to TV remote protocol, host and client |
 | `search` | Recent searches, suggestion model, mood tiles |
 | `siri` | Siri intent handling (guarded by Info.plist flag `SangeetSiriEntitled`) |
 | `tv` | The whole TV app |
+| `update` | Android in-app updater (platform-neutral logic and store; UI: TV `src/tv/UpdateTV.tsx` and Settings, phone `src/ui/UpdatesSection.tsx` and `UpdateBanner.tsx`). Native side: `modules/app-updater` |
 | `ui` | Phone screens and shared components |
 | `util` | Small helpers |
 | `video` | Video counterpart matching, fallback chain, picker, Song/Video controller |
@@ -41,7 +44,9 @@ Key modules:
 - **Library and downloads**: local likes, playlists and follows in SQLite, synced with YouTube Music when signed in. Downloads use a native background URLSession on iOS. Auto-cached songs live in Application Support (excluded from backup) and are evicted least-recently-played first; user downloads are kept.
 - **Local files**: `src/local/` scans `Documents/Music` and reads tags via `StreamProxy.readAudioTags`; `isLocalId` guards every YouTube-only code path.
 - **CarPlay**: `src/carplay/`; needs the CarPlay entitlement (paid team).
+- **Android phone** (same code as iPhone, `Platform.OS === 'android'` gates, never changing iOS): `src/ui/Icon.tsx` renders SF Symbol names as Material Symbols on Android (`iconNames.ts`; `iconNames.test.ts` fails for an unmapped name). `modules/audio-events` reports audio-focus interruptions and notification / headset / Bluetooth commands to `src/player/audioEvents.ts` (the nitro-player patch broadcasts them, see `patches/`). `modules/route-picker` opens the system output switcher, `modules/sangeet-remote` has the NSD client (`RemoteClient.kt`) next to the TV host, `modules/share-intent` hands over `ACTION_SEND` text (`src/ui/incomingLinks.ts` also takes `ACTION_VIEW` links; `app/+native-intent.ts` keeps them off the router), `plugins/withAndroidTV.js` writes the manifest (no fixed orientation, share and view filters, Android Auto descriptor). Portrait is locked per screen by expo-router, full-screen video is landscape. POST_NOTIFICATIONS is requested at the first play (`src/player/notifyPermission.ts`).
 - **TV app** (`src/tv/`): scaled 1440x810 design space (`scale.ts`), D-pad focus via `Focusable`, `modules/tv-keys`, `plugins/withAndroidTV.js` for the leanback manifest. `KeptRoots` in `TVApp.tsx` mounts Home, Search, Library and Settings on first visit and keeps them hidden (`display: none`); `nav.ts` restores each root's last focus. Home data is cached hard (`src/youtube/homeCache.ts`).
+- **Android updater** (`src/update/`, `modules/app-updater`): off unless `SANGEET_UPDATE_REPO` (owner/name, set by the Release workflow) is baked into the build (`extra.updateRepo`). It reads the repo's GitHub Releases (`/releases?per_page=10`, pre-releases included), picks the newest newer version with a `sangeet-android-vX.Y.Z.apk` (or older `sangeet-tv-v*`) asset, downloads it to `cacheDir/updates` (SHA-256 checked when GitHub gives a digest) and installs through `PackageInstaller`. Checks at start (after Home) and every 6 h; with "Install updates automatically" on (default) it downloads at once and installs only when nothing is playing (at launch and when playback stops); otherwise the Home pill / Settings > Updates Update button does it. Needs "Install unknown apps" allowed for Sangeet once; later installs of the same signing key may be silent on Android 12+. Test against a local feed with a screenshot build: `SANGEET_SCREENSHOTS=1 SANGEET_UPDATE_FEED=http://127.0.0.1:8099/releases` (the override is ignored in other builds).
 - **Phone to TV remote**: `src/remote/protocol.ts` (messages, version 1.2, optional fields only so old phones and TVs keep working); `host.ts` runs on the TV (native server in `modules/sangeet-remote`), `phone.ts` and `client.ts` on the phone. The TV is the authority: snapshots carry song and playing-timeline times, resolved layout, video and lyrics state, quality (published by `src/tv/MirrorPublisher.tsx` while a phone is connected). The phone seeks and skips optimistically, then corrects (`phoneClock.ts`, `seekHold.ts`); it never plays video, `OnTvStrip` shows the TV's state (`remote/tvStatus.ts`). Layout model shared in `src/player/layout.ts`.
 
 ## Build, test, release
@@ -50,19 +55,23 @@ Settings live in git-ignored env files: `.env.local` (`SANGEET_BUNDLE_ID`, `APPL
 
 ```sh
 scripts/device-build.sh tv|ios [ref]     # incremental build from a warm worktree; INSTALL=1 also installs
-scripts/testflight.sh [beta|build|metadata|screenshots|release-prep|certs] [ref]
-scripts/android-tv-release.sh            # writes dist/sangeet-tv.apk
+scripts/testflight.sh [beta|build|adhoc|metadata|screenshots|release-prep|certs] [ref]
+scripts/android-tv-release.sh            # writes dist/sangeet-tv.apk (the universal Android APK: phone and TV; the Release workflow publishes it as sangeet-android-vX.Y.Z.apk)
+npx changeset                            # describe a user-visible change (the version comes from changesets)
 npx tsc --noEmit && npx eslint src app && npx jest
 ```
 
 - iPhone: free Apple team needs `SANGEET_FREE_TEAM=1` (no CarPlay, no Siri; installs expire after 7 days). TestFlight, listing and signing: `docs/INSTALL.md`.
-- TV: 32-bit userspace on the Google TV Streamer, so APKs keep both ABIs (`ABIS=arm64-v8a` only for emulator builds). After each install run `adb shell appops set $SANGEET_BUNDLE_ID SYSTEM_ALERT_WINDOW allow`. See `docs/INSTALL-TV.md`.
+- Android: 32-bit userspace on the Google TV Streamer, so APKs keep both ABIs (`ABIS=arm64-v8a` only for emulator builds). Phone install: `docs/INSTALL-ANDROID.md`. Emulators: `sangeet_phone` (Pixel 8, Play Store image, API 36), `sangeet_tv`, `sangeet_tv_slow`. After each install run `adb shell appops set $SANGEET_BUNDLE_ID SYSTEM_ALERT_WINDOW allow`. See `docs/INSTALL-TV.md`.
+- CI: **Checks** on every PR and push to `main`; **Version** keeps one `Release vX.Y.Z` PR (`changeset-release/main`) up to date from pending changesets; merging it (owner only) starts **Release** (iOS Ad Hoc to Firebase, Android APK, GitHub Release), which can also be run by hand (`dry_run` builds and signs without sending). Version stops, without bumping, while a version on `main` is unreleased (a failed release); Checks warns on PRs that change app code without a changeset. Signing secrets are used only by Release's `ios` and `android` jobs (`release` environment). Rules: AGENTS.md; setup: `docs/INSTALL.md`.
 - Backup server: `server/README.md`. OTA updates stay off until `SANGEET_UPDATES_URL` is set at build time.
 - TV performance: `scripts/tv-perf.sh <scenario|all> [label]` against a release build; results go to `dist/tv-perf-<label>.txt`. Use the emulator AVD `sangeet_tv_slow` (`ADB_SERIAL=emulator-5554`).
 - Logs: tags `[queue]`, `[video]`, `[lyrics]`, `[remote]`, `[proxy]`, `[resolver]`, `[carplay]`, `[boot]`. TV: `adb logcat -d -s ReactNativeJS:V`. Phone: Settings > Diagnostics.
 - Dev driver (debug builds): `xcrun simctl openurl booted "sangeet://search?q=<query>&play=0"`.
 
 ## Known gaps
+
+- Android phone: no filled icon variants (Material Symbols font has one weight), alternate app icons, Siri and CarPlay are iOS only, songs picked on Android live in app storage (not visible in other apps), Google sign-in on Android is untested on a device, Android Auto is unit-tested (browse tree) and the system's media browser connects to the service, but it has not been run in the Desktop Head Unit or a car (the emulator image has no Android Auto app, so the DHU cannot start), no like button in the media notification yet.
 
 - CarPlay and Siri need a paid Apple team and have not been exercised on a real car or phone.
 - Audio quality applies from the next song; the video quality picker lists decoder-capable heights, not the current video's formats; phone-to-TV `setQuality` is untested on a device.

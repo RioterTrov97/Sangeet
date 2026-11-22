@@ -1,4 +1,4 @@
-import { requireNativeModule } from 'expo';
+import { requireOptionalNativeModule } from 'expo';
 import type { EventSubscription } from 'expo-modules-core';
 
 export type RemoteCommand = 'pause' | 'stop' | 'toggle' | 'play' | 'next' | 'previous';
@@ -9,4 +9,14 @@ type AudioEventsNative = {
   addListener(event: 'onInterruption', listener: (e: { phase: 'began' | 'ended' }) => void): EventSubscription;
 };
 
-export default requireNativeModule<AudioEventsNative>('AudioEvents');
+const noop = { remove() {} };
+
+/** iOS (Swift) and Android (Kotlin). Loaded optionally so a build without the native side (tests, web) just reports nothing. */
+const native = requireOptionalNativeModule<AudioEventsNative>('AudioEvents');
+
+export default (native ?? {
+  start() {},
+  addListener() {
+    return noop;
+  },
+}) as AudioEventsNative;

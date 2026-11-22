@@ -1,5 +1,5 @@
 import { DlMark } from './DlMark';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 import { usePalette } from './palette/store';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
@@ -61,7 +61,7 @@ export function QueueScreen() {
           overshootRight={false}
           renderRightActions={() => (
             <View style={styles.remove} accessibilityElementsHidden>
-              <SymbolView name="trash" size={18} tintColor="#fff" />
+              <Icon name="trash" size={18} tintColor="#fff" />
             </View>
           )}
           onSwipeableOpen={() => void removeFromQueue(item.pos)}>
@@ -82,7 +82,7 @@ export function QueueScreen() {
               </View>
             </View>
             <Pressable hitSlop={10} onPressIn={drag} accessibilityRole="button" accessibilityLabel="Reorder">
-              <SymbolView name="line.3.horizontal" tintColor={theme.colors.textSecondary} size={18} />
+              <Icon name="line.3.horizontal" tintColor={theme.colors.textSecondary} size={18} />
             </Pressable>
           </Pressable>
         </ReanimatedSwipeable>

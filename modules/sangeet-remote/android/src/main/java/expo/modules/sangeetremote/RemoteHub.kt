@@ -18,6 +18,11 @@ import kotlin.concurrent.thread
 
 private const val TAG = "SangeetRemote"
 
+/** The one APK runs on phones and TVs: the host side (listener, advertisement, wake-up) is for the TV only. */
+fun isTv(ctx: Context): Boolean =
+  (ctx.getSystemService(Context.UI_MODE_SERVICE) as? android.app.UiModeManager)?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION ||
+    ctx.packageManager.hasSystemFeature("android.software.leanback")
+
 /**
  * Owns the TCP listener and the mDNS advertisement for the whole process. It is started by [RemoteService] (boot / app
  * start) so the TV is discoverable with the UI closed. While the React app runs it attaches a [sink] and gets the raw

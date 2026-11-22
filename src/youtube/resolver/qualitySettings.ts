@@ -27,7 +27,7 @@ export function setQuality(patch: Partial<QualitySettings>): void {
 /** What the next resolve should use (Wi-Fi/ethernet vs mobile data, phone only). Read at resolve time: the current track is never touched. */
 export function currentQuality(): { audio: AudioQuality; video: VideoQuality } {
   const q = useQuality.getState();
-  const mobile = Platform.OS === 'ios' && !useNet.getState().wifi;
+  const mobile = (Platform.OS === 'ios' || !Platform.isTV) && !useNet.getState().wifi;
   return { audio: effectiveQuality(q.audio, q.audioMobile, mobile), video: effectiveQuality(q.video, q.videoMobile, mobile) };
 }
 

@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { getAppIconName, setAlternateAppIcon, supportsAlternateIcons } from 'expo-alternate-app-icons';
 
 export type AppIconChoice = { id: 'WhiteOnBlack' | 'BlackOnWhite' | 'GreenOnBlack' | 'Classic'; label: string; preview: number };
@@ -9,7 +10,8 @@ export const APP_ICONS: AppIconChoice[] = [
   { id: 'Classic', label: 'Classic', preview: require('../../assets/icons/preview-Classic.png') },
 ];
 
-export const iconsSupported = () => supportsAlternateIcons;
+/** iOS only: on Android the launcher aliases are removed (plugins/withAndroidTV.js), so the icon cannot be switched. */
+export const iconsSupported = () => Platform.OS === 'ios' && supportsAlternateIcons;
 
 /** Currently active icon id (the default icon reports null). */
 export function currentIcon(): AppIconChoice['id'] {

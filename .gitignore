@@ -42,6 +42,8 @@ vendor/
 fastlane/report.xml
 fastlane/README.md
 build-number.txt
+# Hand-collected Ad Hoc tester UDIDs (scripts/testflight.sh adhoc)
+fastlane/devices*.txt
 
 # Identity values (bundle ID, team): scripts and Expo read it. Every env file is ignored except the examples.
 .env.local

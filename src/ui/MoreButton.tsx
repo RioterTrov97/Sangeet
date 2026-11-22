@@ -1,4 +1,4 @@
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 import { Pressable, type StyleProp, type ViewStyle } from 'react-native';
 import { useUnistyles } from 'react-native-unistyles';
 
@@ -7,7 +7,7 @@ export function MoreButton({ label, onPress, style, color }: { label: string; on
   const { theme } = useUnistyles();
   return (
     <Pressable hitSlop={6} onPress={onPress} style={[{ padding: 12 }, style]} accessibilityRole="button" accessibilityLabel={label}>
-      <SymbolView name="ellipsis" size={18} tintColor={color ?? theme.colors.textSecondary} />
+      <Icon name="ellipsis" size={18} tintColor={color ?? theme.colors.textSecondary} />
     </Pressable>
   );
 }

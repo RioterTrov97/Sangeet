@@ -1,0 +1,380 @@
+# Ships the version in package.json. Runs only when (a) the owner merges the release PR (branch changeset-release/main,
+# kept up to date by the Version workflow), or (b) the owner starts it by hand: Actions > Release > Run workflow, on main.
+# Nothing else deploys. Steps: gates, iOS build to Firebase App Distribution (or TestFlight), signed Android APK (one
+# universal APK: Android phones and Android TV), then a GitHub Release v<version> with the CHANGELOG notes and the APK attached.
+# A merged release PR uses the defaults: iOS adhoc, Android on, gates on, latest stable Xcode.
+# dry_run (manual only) builds and signs everything but sends nothing: iOS runs the build_only lane (App Store signing,
+# no upload), the APK is built but not uploaded anywhere, and no GitHub Release is made. Use it to test the pipeline.
+#
+# The ios and android jobs run in the "release" environment (Settings > Environments). Add yourself as a required
+# reviewer there to approve each deploy after the merge; restrict it to the main branch.
+#
+# Secrets (environment "release", or repository secrets); never put these values in tracked files:
+#   SANGEET_BUNDLE_ID (repository secret: the prepare job reads it), APPLE_TEAM
+#   ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_CONTENT (base64 of the AuthKey .p8)
+#   MATCH_GIT_URL (https URL of the private certs repo), MATCH_PASSWORD,
+#   MATCH_GIT_BASIC_AUTHORIZATION (base64 of "github-user:token"; write access to the certs repo for adhoc, which
+#     refreshes the Ad Hoc profile when devices change; read access is enough for beta)
+#   adhoc: FIREBASE_APP_ID, FIREBASE_GROUPS, FIREBASE_SERVICE_ACCOUNT_CONTENT (base64 of the service account JSON)
+#   Android: ANDROID_KEYSTORE_BASE64 (base64 of android-keystore/sangeet-release.jks), SANGEET_KEYSTORE_PASSWORD (from
+#     .env.android). Same key as local builds, or Android (phone and TV) updates stop installing.
+#   optional: BETA_FEEDBACK_EMAIL
+#
+#   CI_LOG_PASSPHRASE (recommended): encrypts the full build logs, uploaded as a 7-day artifact only you can read.
+#
+# This repo is public, so run logs are public. Build steps run through scripts/ci-run.sh: the full output goes to a
+# file, the public log shows only summary and scrubbed error lines, and each job writes a summary table. The full logs
+# are uploaded only encrypted (scripts/ci-logs-encrypt.sh). The IPA is never uploaded to GitHub.
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ios:
+        description: 'iOS build'
+        type: choice
+        options: [adhoc, beta, skip]
+        default: adhoc
+      android:
+        description: 'Build the Android APK (phone and TV)'
+        type: boolean
+        default: true
+      dry_run:
+        description: 'Dry run: build and sign, but send nothing to testers and make no GitHub Release'
+        type: boolean
+        default: false
+      skip_gates:
+        description: 'Skip tsc, eslint and jest (not recommended)'
+        type: boolean
+        default: false
+      xcode:
+        description: 'Xcode version on the runner (setup-xcode syntax)'
+        type: string
+        default: latest-stable
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  LANG: en_US.UTF-8
+  LC_ALL: en_US.UTF-8
+  SANGEET_BUNDLE_ID: ${{ secrets.SANGEET_BUNDLE_ID }}
+
+jobs:
+  prepare:
+    # Manual run on main by the owner, or the owner merging the release PR from this repository (never a fork).
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == github.repository_owner) ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true &&
+       github.event.pull_request.head.ref == 'changeset-release/main' &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       github.event.pull_request.merged_by.login == github.repository_owner)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      sha: ${{ steps.v.outputs.sha }}
+      ios: ${{ steps.v.outputs.ios }}
+      android: ${{ steps.v.outputs.android }}
+      xcode: ${{ steps.v.outputs.xcode }}
+      dry_run: ${{ steps.v.outputs.dry_run }}
+    env:
+      # The merge commit on main for a merged PR; the main tip for a manual run.
+      SHA: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+      IN_IOS: ${{ inputs.ios || 'adhoc' }}
+      IN_ANDROID: ${{ github.event_name == 'pull_request' || inputs.android }}
+      IN_XCODE: ${{ inputs.xcode || 'latest-stable' }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+      - id: v
+        name: Version, tag and changesets
+        run: |
+          v=$(node -p "require('./package.json').version")
+          [ "$DRY_RUN" = true ] && [ "$IN_IOS" != skip ] && IN_IOS=build_only
+          { echo "version=$v"; echo "sha=$SHA"; echo "ios=$IN_IOS"; echo "android=$IN_ANDROID"; echo "xcode=$IN_XCODE"; echo "dry_run=$DRY_RUN"; } >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$v" >/dev/null; then
+            if [ "$DRY_RUN" = true ]; then echo "::notice::v$v is already released; dry run only."
+            else echo "::error::v$v is already released. Add changesets and merge the release PR."; exit 1; fi
+          fi
+          # Normal after a failed release: changes pushed since then ship in this build, and their notes come with the next version.
+          if find .changeset -maxdepth 1 -name '*.md' ! -name README.md | grep -q .; then
+            echo "::warning::Changesets are pending on main. Their code is in this build; their notes go into the next release."
+          fi
+          node scripts/release-notes.mjs "$v" > /dev/null || { echo "::error::CHANGELOG.md has no ## $v section"; exit 1; }
+          [ -n "$SANGEET_BUNDLE_ID" ] || { echo "::error::Missing repository secret SANGEET_BUNDLE_ID"; exit 1; }
+          what="Releasing"; [ "$DRY_RUN" = true ] && what="Dry run (nothing is sent)"
+          echo "$what **v$v** (${{ github.event_name == 'pull_request' && 'release PR merged' || 'manual run' }}): iOS \`$IN_IOS\`, Android \`$IN_ANDROID\`" >> "$GITHUB_STEP_SUMMARY"
+
+  gates:
+    needs: prepare
+    if: ${{ !inputs.skip_gates }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx tsc --noEmit
+      - run: npx eslint src app
+      - run: npx jest --ci
+
+  ios:
+    needs: [prepare, gates]
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && (needs.gates.result == 'success' || needs.gates.result == 'skipped') && needs.prepare.outputs.ios != 'skip' }}
+    runs-on: macos-26
+    environment: release
+    timeout-minutes: 120
+    env:
+      CI: 'true'
+      SKIP_GATES: '1' # the gates job already ran them
+      SANGEET_FREE_TEAM: '0'
+      SANGEET_CARPLAY: '0' # 1 once Apple approves the CarPlay entitlement
+      SANGEET_APPLE_TEAM: ${{ secrets.APPLE_TEAM }}
+      APPLE_TEAM: ${{ secrets.APPLE_TEAM }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+      MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+      FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+      FIREBASE_GROUPS: ${{ secrets.FIREBASE_GROUPS }}
+      FIREBASE_SERVICE_ACCOUNT_CONTENT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CONTENT }}
+      BETA_FEEDBACK_EMAIL: ${{ secrets.BETA_FEEDBACK_EMAIL }}
+      LANE: ${{ needs.prepare.outputs.ios }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          fetch-depth: 0
+
+      - name: Check secrets
+        run: |
+          need="APPLE_TEAM ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_CONTENT MATCH_GIT_URL MATCH_PASSWORD MATCH_GIT_BASIC_AUTHORIZATION"
+          [ "$LANE" = adhoc ] && need="$need FIREBASE_APP_ID FIREBASE_GROUPS FIREBASE_SERVICE_ACCOUNT_CONTENT"
+          missing=""; for v in $need; do [ -n "${!v}" ] || missing="$missing $v"; done
+          [ -z "$missing" ] || { echo "::error::Missing secrets (environment release or repository):$missing"; exit 1; }
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ needs.prepare.outputs.xcode }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+          bundler-cache: true
+
+      - run: npm ci --no-audit --no-fund
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos
+          key: pods-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.config.ts', 'plugins/**', 'patches/**') }}
+          restore-keys: pods-${{ runner.os }}-
+
+      - name: Mask derived identifiers
+        run: |
+          # Secrets are masked by GitHub; values derived from them are not. The Firebase project number is part of the app ID.
+          p="${FIREBASE_APP_ID#1:}"; p="${p%%:*}"; [ -n "$p" ] && echo "::add-mask::$p"
+          echo "::add-mask::$(id -un)"
+          true
+
+      - name: Generate the iOS project
+        env:
+          CI_SHOW: '^__summary_only__$'
+        run: scripts/ci-run.sh ios-prebuild npx expo prebuild -p ios
+
+      - name: fastlane ${{ needs.prepare.outputs.ios }}
+        run: |
+          node scripts/release-notes.mjs > "$RUNNER_TEMP/notes.md"
+          export RELEASE_NOTES_FILE="$RUNNER_TEMP/notes.md"
+          # The lanes tag the commit locally (adhoc/*, testflight/*); that tag stays on this runner.
+          git config user.name "release-ci" && git config user.email "release-ci@users.noreply.github.com"
+          scripts/ci-run.sh "fastlane-$LANE" bundle exec fastlane ios "$LANE"
+
+      - name: Summary
+        if: success()
+        run: |
+          where="Firebase App Distribution, group(s) set in FIREBASE_GROUPS"; [ "$LANE" = beta ] && where="TestFlight, internal testers"
+          [ "$LANE" = build_only ] && where="nowhere (dry run: built and signed only)"
+          {
+            echo "### iPhone"
+            echo "| | |"; echo "| --- | --- |"
+            echo "| Version (build) | $(cat build-number.txt 2>/dev/null || echo '?') |"
+            echo "| Lane | \`$LANE\` |"
+            echo "| Sent to | $where |"
+            echo "| Xcode | $(xcodebuild -version | head -1) |"
+            echo "| Notes | CHANGELOG.md section for v${{ needs.prepare.outputs.version }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Encrypted full logs
+        if: always()
+        env:
+          CI_LOG_PASSPHRASE: ${{ secrets.CI_LOG_PASSPHRASE }}
+        run: scripts/ci-logs-encrypt.sh ios
+
+      - uses: actions/upload-artifact@v4
+        if: always() && hashFiles('ci-logs-ios.tar.gz.enc') != ''
+        with:
+          name: logs-ios-encrypted
+          path: ci-logs-ios.tar.gz.enc
+          retention-days: 7
+
+  android:
+    needs: [prepare, gates]
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && (needs.gates.result == 'success' || needs.gates.result == 'skipped') && needs.prepare.outputs.android == 'true' }}
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 90
+    env:
+      SANGEET_KEYSTORE_PASSWORD: ${{ secrets.SANGEET_KEYSTORE_PASSWORD }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      SANGEET_UPDATE_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+
+      - name: Check secrets
+        run: |
+          [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$SANGEET_KEYSTORE_PASSWORD" ] \
+            || { echo "::error::Missing ANDROID_KEYSTORE_BASE64 or SANGEET_KEYSTORE_PASSWORD"; exit 1; }
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.config.ts', 'plugins/**', 'patches/**') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Release keystore
+        run: |
+          mkdir -p android-keystore
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android-keystore/sangeet-release.jks
+          chmod 600 android-keystore/sangeet-release.jks
+
+      # Both ABIs: the Google TV Streamer runs a 32-bit userspace.
+      - name: Build the signed APK
+        env:
+          CI_SHOW: '^BUILD (SUCCESSFUL|FAILED)'
+        run: scripts/ci-run.sh android-build scripts/android-tv-release.sh
+
+      - name: Name it by version
+        run: mv dist/sangeet-tv.apk "dist/sangeet-android-v${{ needs.prepare.outputs.version }}.apk"
+
+      - name: Summary
+        run: |
+          apk="dist/sangeet-android-v${{ needs.prepare.outputs.version }}.apk"
+          signer="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
+          cert=$("$signer" verify --print-certs "$apk" | sed -n 's/.*certificate SHA-256 digest: //p' | head -1)
+          code=$(node -e "const [a,b,c]=require('./package.json').version.split('.').map(Number);console.log(a*10000+b*100+c)")
+          {
+            echo "### Android (phone and TV)"
+            echo "| | |"; echo "| --- | --- |"
+            echo "| APK | \`$(basename "$apk")\` ($(du -h "$apk" | cut -f1)) |"
+            echo "| versionCode | $code |"
+            echo "| ABIs | arm64-v8a, armeabi-v7a |"
+            echo "| APK SHA-256 | \`$(sha256sum "$apk" | cut -d' ' -f1)\` |"
+            echo "| Signing cert SHA-256 | \`${cert:-?}\` (must match the installed app, or updates will not install) |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: needs.prepare.outputs.dry_run != 'true'
+        with:
+          name: android-apk
+          path: dist/sangeet-android-v*.apk
+          retention-days: 1 # only handed to the publish job; the GitHub Release keeps the APK
+
+      - name: Remove the keystore
+        if: always()
+        run: rm -f android-keystore/sangeet-release.jks
+
+      - name: Encrypted full logs
+        if: always()
+        env:
+          CI_LOG_PASSPHRASE: ${{ secrets.CI_LOG_PASSPHRASE }}
+        run: scripts/ci-logs-encrypt.sh android
+
+      - uses: actions/upload-artifact@v4
+        if: always() && hashFiles('ci-logs-android.tar.gz.enc') != ''
+        with:
+          name: logs-android-encrypted
+          path: ci-logs-android.tar.gz.enc
+          retention-days: 7
+
+  publish:
+    needs: [prepare, ios, android]
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && needs.prepare.outputs.dry_run != 'true' && (needs.ios.result == 'success' || needs.ios.result == 'skipped') && (needs.android.result == 'success' || needs.android.result == 'skipped') && (needs.ios.result == 'success' || needs.android.result == 'success') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      V: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+
+      - uses: actions/download-artifact@v4
+        if: needs.android.result == 'success'
+        with:
+          name: android-apk
+          path: dist
+
+      - name: GitHub Release v${{ needs.prepare.outputs.version }}
+        run: |
+          node scripts/release-notes.mjs "$V" > "$RUNNER_TEMP/notes.md"
+          {
+            echo
+            echo "---"
+            [ "${{ needs.ios.result }}" = success ] && echo "- iPhone: sent to testers (${{ needs.prepare.outputs.ios == 'adhoc' && 'Firebase App Distribution' || 'TestFlight' }})."
+            [ "${{ needs.android.result }}" = success ] && echo "- Android: \`sangeet-android-v$V.apk\` below. One APK for Android phones and Android TV: open it on the phone (allow installs from your browser or file manager), or sideload it on a TV with adb install -r. Later updates install from inside the app."
+          } >> "$RUNNER_TEMP/notes.md"
+          # A second copy under a fixed name: https://github.com/<owner>/<repo>/releases/latest/download/sangeet-android.apk always
+          # serves the newest APK, so a TV's Downloader code (or any bookmark) never has to change. Every release is marked latest.
+          [ -f "dist/sangeet-android-v$V.apk" ] && cp "dist/sangeet-android-v$V.apk" dist/sangeet-android.apk
+          shopt -s nullglob; apks=(dist/*.apk)
+          gh release create "v$V" --target "${{ needs.prepare.outputs.sha }}" --title "Sangeet $V" --notes-file "$RUNNER_TEMP/notes.md" --latest "${apks[@]}"
+          {
+            echo "### Release"
+            echo "- GitHub Release: $(gh release view "v$V" --json url -q .url)"
+            [ -f dist/sangeet-android.apk ] && echo "- Latest APK (stable link): https://github.com/$GITHUB_REPOSITORY/releases/latest/download/sangeet-android.apk"
+            echo "- iPhone: ${{ needs.ios.result }}, Android: ${{ needs.android.result }}"
+          } >> "$GITHUB_STEP_SUMMARY"

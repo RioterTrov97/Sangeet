@@ -1,4 +1,5 @@
-import { SymbolView, type SFSymbol } from 'expo-symbols';
+import type { SFSymbol } from 'expo-symbols';
+import { Icon } from './Icon';
 import { useEffect } from 'react';
 import { Pressable, Text, View, type DimensionValue, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
@@ -36,7 +37,7 @@ function Rings({ icon, tone }: { icon: SFSymbol; tone: EmptyTone }) {
       <View style={[styles.ring, { width: m.ringOuter, height: m.ringOuter, borderColor: withAlpha(color, m.ringOuterAlpha) }]} />
       <View style={[styles.ring, { width: m.ringInner, height: m.ringInner, borderColor: withAlpha(color, m.ringInnerAlpha) }]} />
       <View style={{ width: m.circle, height: m.circle, borderRadius: m.circle / 2, backgroundColor: circleFill(tone), alignItems: 'center', justifyContent: 'center' }}>
-        <SymbolView name={icon} size={m.icon} tintColor={color} />
+        <Icon name={icon} size={m.icon} tintColor={color} />
       </View>
     </View>
   );
@@ -62,7 +63,7 @@ function GhostRows({ icon, tone }: { icon: SFSymbol; tone: EmptyTone }) {
         ))}
       </Animated.View>
       <View style={[styles.badge, { backgroundColor: EMPTY_TONES[tone].color }]}>
-        <SymbolView name={icon} size={20} tintColor="#fff" />
+        <Icon name={icon} size={20} tintColor="#fff" />
       </View>
     </View>
   );

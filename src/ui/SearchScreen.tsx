@@ -1,7 +1,7 @@
 import { useFloatingInset } from './floating';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 import { Alert, Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -248,7 +248,7 @@ export function SearchScreen() {
         right={<MicButton voice={voice} />}
         bar={
           <View ref={fieldRef as never} collapsable={false} style={[styles.inputWrap, cardShown && styles.inputWrapOpen]}>
-                  <SymbolView name="magnifyingglass" size={18} tintColor={theme.colors.textSecondary} />
+                  <Icon name="magnifyingglass" size={18} tintColor={theme.colors.textSecondary} />
                   <TextInput
                     style={styles.input}
                     value={input}
@@ -265,7 +265,7 @@ export function SearchScreen() {
                   />
                   {input ? (
                     <Pressable hitSlop={10} onPress={clear} accessibilityRole="button" accessibilityLabel="Clear search">
-                      <SymbolView name="xmark.circle.fill" size={18} tintColor={theme.colors.textTertiary} />
+                      <Icon name="xmark.circle.fill" size={18} tintColor={theme.colors.textTertiary} />
                     </Pressable>
                   ) : null}
                 </View>
@@ -290,7 +290,7 @@ function MicButton({ voice }: { voice: ReturnType<typeof useVoiceSearch> }) {
       accessibilityRole="button"
       accessibilityLabel={listening ? 'Stop voice search' : 'Voice search'}>
       <Animated.View style={anim}>
-        <SymbolView name={listening ? 'mic.fill' : 'mic'} size={18} tintColor={listening ? '#000' : theme.colors.text} />
+        <Icon name={listening ? 'mic.fill' : 'mic'} size={18} tintColor={listening ? '#000' : theme.colors.text} />
       </Animated.View>
     </Pressable>
   );
@@ -308,7 +308,7 @@ function MoodTile({ mood, onPress }: { mood: Mood; onPress: () => void }) {
           <Path key={i} d={sh.d} fill={sh.fill} fillOpacity={sh.opacity} />
         ))}
       </Svg>
-      <SymbolView name={moodIcon(mood.title) as never} size={18} tintColor="rgba(255,255,255,0.85)" style={styles.moodIcon} />
+      <Icon name={moodIcon(mood.title) as never} size={18} tintColor="rgba(255,255,255,0.85)" style={styles.moodIcon} />
       <Text style={styles.moodText} numberOfLines={2}>
         {mood.title}
       </Text>

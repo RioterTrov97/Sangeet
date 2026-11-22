@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePlayerStore } from '../player/store';
@@ -10,6 +11,8 @@ export const SIDE = 12;
 
 /** Distance from the screen edge to the floating chrome: tucked toward the home indicator like iOS 26 bars. */
 export function floatBottom(inset: number): number {
+  // Android draws edge to edge under the gesture / navigation bar: sit above it instead of tucking toward the home indicator.
+  if (Platform.OS === 'android') return inset + FLOAT_GAP;
   return Math.max(inset - 18, FLOAT_GAP);
 }
 

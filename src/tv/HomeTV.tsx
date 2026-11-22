@@ -20,6 +20,7 @@ import { itemTitle } from '../ui/itemText';
 import { ActionButton, SAFE_X, SAFE_Y } from './grid';
 import { onNavKey } from '../../modules/tv-keys';
 import { tvNav } from './nav';
+import { UpdatePill } from './UpdateTV';
 import { Button, CARD_GAP, CARD_LABELS, Focusable, MoodTile, Row, activate, rememberFocus, useRestoreOnce, ring, setBackdrop } from './ui';
 import { useTvWindow } from './scale';
 import { perfEnd } from '../util/perf';
@@ -265,6 +266,7 @@ export function HomeTV() {
   const { data, isLoading, isError, refetch } = useHome();
   const offline = useIsOffline();
   const personal = usePersonal();
+  const nowTrack = useNowPlaying().track;
   const explore = useExplore();
   // Rows below the first screen load one at a time: after the app has been idle for a moment, or as focus nears them.
   const stage = useHomeStage(!!data || !!explore.data);
@@ -345,6 +347,7 @@ export function HomeTV() {
     <View style={{ flex: 1 }}>
       {bg}
       <ScrollView ref={scroll} contentContainerStyle={st.content} showsVerticalScrollIndicator={false}>
+        <UpdatePill shift={!!nowTrack} />
         <Spotlight trending={c.topSongs[0]} onSection={() => snap('spot')} />
         <View onLayout={lay('quick')}>
           <QuickGrid items={c.quick} onSection={() => snap('quick')} />

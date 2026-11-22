@@ -1,4 +1,4 @@
-import { SymbolView } from 'expo-symbols';
+import { Icon } from '../ui/Icon';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
@@ -17,7 +17,7 @@ export function RemoteBanner() {
   return (
     <View style={[styles.wrap, { bottom }]} pointerEvents="none" accessibilityLiveRegion="polite">
       <View style={styles.pill}>
-        <SymbolView name="tv" size={18} tintColor="#FFFFFF" />
+        <Icon name="tv" size={18} tintColor="#FFFFFF" />
         <Text style={styles.text} numberOfLines={1}>
           Reconnecting to {name || 'TV'}…
         </Text>

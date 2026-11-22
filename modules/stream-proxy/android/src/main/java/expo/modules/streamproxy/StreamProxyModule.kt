@@ -40,8 +40,8 @@ class StreamProxyModule : Module() {
       extractor.load(appContext.reactContext!!.applicationContext, html, baseUrl)
     }
 
-    // Songs from this phone exist on iOS only; the TV never calls this.
-    AsyncFunction("readAudioTags") { _: String, _: String -> mapOf("hasArtwork" to false) }
+    // Songs from this phone (the TV never calls this): tags and embedded cover via MediaMetadataRetriever.
+    AsyncFunction("readAudioTags") { path: String, artworkOut: String -> AudioTags.read(path, artworkOut) }
 
     Function("setSimulateOffline") { on: Boolean -> simulateOffline = on }
 

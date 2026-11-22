@@ -1,5 +1,7 @@
 import type { ExpoConfig } from 'expo/config';
 
+import { version } from './package.json';
+
 // A free Personal Team can sign neither the CarPlay nor the Siri entitlement. One switch turns both off:
 //   SANGEET_FREE_TEAM=1 npx expo run:ios --device
 // (or individually: SANGEET_CARPLAY=0, SANGEET_SIRI=0; the Siri entitlement itself is added by modules/siri-media/plugin).
@@ -17,14 +19,30 @@ const updatesUrl = process.env.SANGEET_UPDATES_URL;
 // so `sangeet://dev?cmd=...` can start a song before each capture. Never set for TestFlight (app.config.test.ts guards the default).
 const screenshots = process.env.SANGEET_SCREENSHOTS === '1';
 
+// Android TV in-app updater: the GitHub repo (owner/name) whose Releases carry sangeet-tv-vX.Y.Z.apk. Unset = updater fully off
+// (no network calls, no UI). The Release workflow sets it for the TV build. See src/update/.
+// SANGEET_UPDATE_FEED (a full releases URL, to test against a local server) is only honoured in screenshot builds; src/update/config.ts
+// also ignores it unless the dev hooks are on, so release builds cannot be pointed elsewhere.
+const updateRepo = process.env.SANGEET_UPDATE_REPO || undefined;
+const updateFeed = screenshots ? process.env.SANGEET_UPDATE_FEED || undefined : undefined;
+
+// Android Auto: the media app descriptor in the manifest and the browsable library (src/androidauto/). On by default;
+// SANGEET_ANDROID_AUTO=0 builds without it. Read here for the manifest plugin and passed to JS through `extra`.
+const androidAuto = process.env.SANGEET_ANDROID_AUTO !== '0';
+
 // Bundle ID (iOS) and applicationId (Android) come from git-ignored .env.local (see .env.local.example).
 const bundleId = process.env.SANGEET_BUNDLE_ID || 'com.example.sangeet';
+
+// The app version is package.json's (bumped by changesets). Android needs an increasing integer: 1.2.3 -> 10203.
+// iOS build numbers are set at release time by fastlane.
+const [major, minor, patch] = version.split('.').map((n) => parseInt(n, 10));
+const androidVersionCode = major * 10000 + minor * 100 + patch;
 
 const config: ExpoConfig = {
   name: 'Sangeet',
   slug: 'sangeet',
   scheme: 'sangeet',
-  version: '0.1.0',
+  version,
   // Portrait everywhere (each screen locks it, app/_layout); full-screen video turns to landscape, so the app must allow it.
   orientation: 'default',
   icon: './assets/images/icon.png',
@@ -80,11 +98,12 @@ const config: ExpoConfig = {
       monochromeImage: './assets/images/android-icon-monochrome.png',
     },
     package: bundleId,
+    versionCode: androidVersionCode,
     predictiveBackGestureEnabled: false,
   },
   plugins: [
     // First in the list = its manifest mod runs last (mods unwind in reverse), so it can post-process what the plugins below write.
-    './plugins/withAndroidTV',
+    ['./plugins/withAndroidTV', { androidAuto }],
     'expo-router',
     './modules/siri-media/plugin',
     ['expo-build-properties', { ios: { deploymentTarget: '17.0' } }],
@@ -113,7 +132,7 @@ const config: ExpoConfig = {
   // OTA JS updates (YouTube-breakage fixes without a rebuild). Off until SANGEET_UPDATES_URL is set: see docs/INSTALL.md.
   runtimeVersion: { policy: 'appVersion' },
   updates: updatesUrl ? { url: updatesUrl, checkAutomatically: 'ON_LOAD', fallbackToCacheTimeout: 0 } : { enabled: false },
-  extra: { screenshots },
+  extra: { screenshots, updateRepo, updateFeed, androidAuto },
   experiments: { typedRoutes: true, reactCompiler: true },
 };
 

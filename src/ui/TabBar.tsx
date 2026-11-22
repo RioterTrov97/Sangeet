@@ -1,5 +1,6 @@
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
-import { SymbolView, type SFSymbol } from 'expo-symbols';
+import type { SFSymbol } from 'expo-symbols';
+import { Icon } from './Icon';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet } from 'react-native-unistyles';
@@ -37,7 +38,7 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
                 onPress={() => {
                   if (!focused) navigateToTab(route.key);
                 }}>
-                <SymbolView name={ICONS[route.name] ?? 'circle'} tintColor={color} size={22} />
+                <Icon name={ICONS[route.name] ?? 'circle'} tintColor={color} size={22} />
                 <Text style={[styles.label, { color }]}>{descriptors[route.key].options.title ?? route.name}</Text>
               </Pressable>
             );

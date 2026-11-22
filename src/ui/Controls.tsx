@@ -1,4 +1,5 @@
-import { SymbolView, type SFSymbol } from 'expo-symbols';
+import type { SFSymbol } from 'expo-symbols';
+import { Icon } from './Icon';
 import { Pressable, Text, type StyleProp, type ViewStyle } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -6,7 +7,7 @@ export function IconButton({ name, size = 22, color, label, onPress, style, acti
   const { theme } = useUnistyles();
   return (
     <Pressable hitSlop={12} onPress={onPress} style={style} accessibilityRole="button" accessibilityLabel={label} accessibilityState={active === undefined ? undefined : { selected: active }}>
-      <SymbolView name={name} size={size} tintColor={color ?? (active ? theme.colors.accent : theme.colors.text)} fallback={<Text style={{ color: theme.colors.text }}>•</Text>} />
+      <Icon name={name} size={size} tintColor={color ?? (active ? theme.colors.accent : theme.colors.text)} fallback={<Text style={{ color: theme.colors.text }}>•</Text>} />
     </Pressable>
   );
 }
@@ -19,7 +20,7 @@ export function PlayButton({ playing, size = 56, onPress, label, fill, iconColor
       accessibilityRole="button"
       accessibilityLabel={label ?? (playing ? 'Pause' : 'Play')}
       style={[styles.play, fill ? { backgroundColor: fill } : null, { width: size, height: size, borderRadius: size / 2 }]}>
-      <SymbolView name={playing ? 'pause.fill' : 'play.fill'} size={size * 0.45} tintColor={iconColor} />
+      <Icon name={playing ? 'pause.fill' : 'play.fill'} size={size * 0.45} tintColor={iconColor} />
     </Pressable>
   );
 }

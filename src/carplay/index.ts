@@ -82,10 +82,10 @@ async function cached<T>(key: unknown[], fn: () => Promise<T>, onChange?: () => 
   return withTimeout(queryClient.fetchQuery({ queryKey: key, queryFn: fn, staleTime: STALE_MS }));
 }
 
-const homeShelves = (onChange?: () => void) => cached<Shelf[]>(HOME_KEY, getHome, onChange);
-const album = (id: string) => cached(['yt', 'album', id], () => getAlbum(id));
-const artist = (id: string) => cached(['yt', 'artist', id], () => getArtist(id));
-const playlist = (id: string) => cached(['yt', 'cp-playlist', id], () => fetchPlaylist(id));
+export const homeShelves = (onChange?: () => void) => cached<Shelf[]>(HOME_KEY, getHome, onChange);
+export const album = (id: string) => cached(['yt', 'album', id], () => getAlbum(id));
+export const artist = (id: string) => cached(['yt', 'artist', id], () => getArtist(id));
+export const playlist = (id: string) => cached(['yt', 'cp-playlist', id], () => fetchPlaylist(id));
 
 // ---- loaders ----
 
@@ -109,7 +109,7 @@ async function loadHome(): Promise<CarPlayListTemplate> {
 }
 
 /** Real library data: liked tracks, saved playlists, and saved + recently played albums/artists. */
-function libraryData(): LibraryData {
+export function libraryData(): LibraryData {
   const { liked, saved } = libraryState();
   const h = getHistory();
   const pick = (f: 'albums' | 'artists') => libraryItems(f, saved, h, 'recent').map((x) => ({ id: x.id, name: x.kind === 'artist' ? x.name : x.title, artwork: x.artwork }));
@@ -118,7 +118,7 @@ function libraryData(): LibraryData {
   return { liked, recentAlbums: pick('albums'), recentArtists: pick('artists'), playlists };
 }
 
-function downloadsData(): DownloadsData {
+export function downloadsData(): DownloadsData {
   // Songs from this iPhone are on the device like downloads, so they are listed here too.
   const tracks = [...downloadedTracks(), ...localTracks()];
   const byId = new Map(tracks.map((t) => [t.id, t]));

@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TextTicker from 'react-native-text-ticker';
 import { StyleSheet } from 'react-native-unistyles';
 import type { SFSymbol } from 'expo-symbols';
-import { SymbolView } from 'expo-symbols';
+import { Icon } from './Icon';
 
 import { savedArtworkUrl, useIsAutoCached } from '../downloads/autoCache';
 import { downloadTracks, removeDownload, retryDownload, useDownloadRow } from '../downloads/manager';
@@ -89,7 +89,7 @@ const pillStyles = StyleSheet.create((theme) => ({
 function GlassCircleFace({ name, color = '#fff', size = 40 }: { name: SFSymbol; color?: string; size?: number }) {
   return (
     <Glass radius={size / 2} style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }} interactive>
-      <SymbolView name={name} size={size * 0.45} tintColor={color} />
+      <Icon name={name} size={size * 0.45} tintColor={color} />
     </Glass>
   );
 }
@@ -234,7 +234,7 @@ function PlayerContent() {
           </Pressable>
           {offlineHint && !tvName ? (
             <Pressable onPress={() => { tap(); void playOfflineSongs(); }} style={styles.offline} accessibilityRole="button" accessibilityLabel="You're offline. This song plays when you're back online. Play offline songs">
-              <SymbolView name="wifi.slash" size={13} tintColor={fg.dim} />
+              <Icon name="wifi.slash" size={13} tintColor={fg.dim} />
               <Text style={[styles.offlineText, { color: fg.dim }]} numberOfLines={1}>
                 Offline · <Text style={{ color: palette.accent }}>Play offline songs</Text>
               </Text>
@@ -259,7 +259,7 @@ function PlayerContent() {
       <View style={styles.controls}>
         <IconButton name="backward.fill" size={38} color={fg.text} label="Previous" onPress={() => { tap(); void skipPrevious(); }} />
         <Pressable onPress={() => { tap(); void togglePlay(); }} accessibilityRole="button" accessibilityLabel={loading ? 'Loading, pause' : isPlaying ? 'Pause' : 'Play'} style={[styles.play, { backgroundColor: palette.accent }]}>
-          {loading ? <ActivityIndicator size="large" color={palette.onAccent} /> : <SymbolView name={isPlaying ? 'pause.fill' : 'play.fill'} size={34} tintColor={palette.onAccent} />}
+          {loading ? <ActivityIndicator size="large" color={palette.onAccent} /> : <Icon name={isPlaying ? 'pause.fill' : 'play.fill'} size={34} tintColor={palette.onAccent} />}
         </Pressable>
         <IconButton name="forward.fill" size={38} color={fg.text} label="Next" onPress={() => { tap(); void skipNext(); }} />
       </View>
