@@ -18,7 +18,7 @@
 #   adhoc: FIREBASE_APP_ID, FIREBASE_GROUPS, FIREBASE_SERVICE_ACCOUNT_CONTENT (base64 of the service account JSON)
 #   Android: ANDROID_KEYSTORE_BASE64 (base64 of android-keystore/sangeet-release.jks), SANGEET_KEYSTORE_PASSWORD (from
 #     .env.android). Same key as local builds, or Android (phone and TV) updates stop installing.
-#   optional: BETA_FEEDBACK_EMAIL
+#   optional: MATCH_GIT_BRANCH (the certs repo branch, if not master), BETA_FEEDBACK_EMAIL
 #
 #   CI_LOG_PASSPHRASE (recommended): encrypts the full build logs, uploaded as a 7-day artifact only you can read.
 #
@@ -152,6 +152,7 @@ jobs:
       MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
       MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
       MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+      MATCH_GIT_BRANCH: ${{ secrets.MATCH_GIT_BRANCH }} # optional; match's default is master
       FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
       FIREBASE_GROUPS: ${{ secrets.FIREBASE_GROUPS }}
       FIREBASE_SERVICE_ACCOUNT_CONTENT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CONTENT }}

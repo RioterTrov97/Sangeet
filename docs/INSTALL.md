@@ -96,6 +96,7 @@ Secrets (the `release` environment, or Settings > Secrets and variables > Action
 | `ASC_KEY_ID`, `ASC_ISSUER_ID` | `.env.testflight` |
 | `ASC_KEY_CONTENT` | `base64 -i ~/.appstoreconnect/private_keys/AuthKey_XXX.p8 \| pbcopy` |
 | `MATCH_GIT_URL`, `MATCH_PASSWORD` | `.env.testflight` (the URL must be `https://`) |
+| `MATCH_GIT_BRANCH` (if the certs repo branch is not `master`) | `.env.testflight` |
 | `MATCH_GIT_BASIC_AUTHORIZATION` | `printf 'github-user:TOKEN' \| base64 \| pbcopy`, a fine-grained token for the certs repo only, Contents read and write |
 | `FIREBASE_APP_ID`, `FIREBASE_GROUPS` | `.env.testflight` |
 | `FIREBASE_SERVICE_ACCOUNT_CONTENT` | `base64 -i <service account JSON> \| pbcopy` |
