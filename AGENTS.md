@@ -125,6 +125,10 @@ Rules for changing CI:
 - **Secrets** live only in GitHub secrets (repository or the `release` environment) and git-ignored env files. Values derived from a secret are not
   masked automatically: mask them with `::add-mask::` before anything can print them. Decode key files into the
   runner's temp or a git-ignored path, and delete them in an `if: always()` step.
+- **Caches** (`actions/cache`): node_modules and the tsc/eslint/jest caches (Checks and Release gates, same keys), CocoaPods
+  and ccache (`USE_CCACHE=1`) in the iOS job, Gradle with its build cache and the NDK (only when the runner lacks it) in
+  the Android job. Pull request runs, forks included, can restore caches saved on `main`, so a cache must never hold a
+  secret, a key, a signed artifact or anything derived from them: cache inputs and compiled objects only.
 - Pin actions to a major version from the publisher (`actions/*`, `ruby/setup-ruby`, `maxim-lobanov/setup-xcode`); do
   not add third-party actions that receive secrets without asking the developer.
 - Changing signing (new profiles, certificates, keystore) or adding a secret needs the developer's go-ahead.

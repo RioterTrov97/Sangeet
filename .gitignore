@@ -52,3 +52,7 @@ fastlane/devices*.txt
 
 # Local agent settings
 .claude/
+
+# CI tool caches (checks.yml)
+.tsbuildinfo
+.eslintcache

@@ -152,10 +152,29 @@ jobs:
         with:
           node-version: 26
           cache: npm
-      - run: npm ci --no-audit --no-fund
-      - run: npx tsc --noEmit
-      - run: npx eslint src app
-      - run: npx jest --ci
+      # The same caches as Checks (same keys). Caches are shared per branch, so on main this job reuses what Checks
+      # saved for the same commit: installs are skipped and tsc/eslint only recheck changed files. The gates still run
+      # here on purpose: Release must not trust another workflow's result.
+      - id: modules
+        uses: actions/cache@v6
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node26-${{ hashFiles('package-lock.json', 'patches/**') }}
+      - if: steps.modules.outputs.cache-hit != 'true'
+        run: npm ci --no-audit --no-fund
+      - uses: actions/cache@v6
+        with:
+          path: |
+            .tsbuildinfo
+            .eslintcache
+            ${{ runner.temp }}/jest-cache
+          key: tool-caches-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            tool-caches-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+            tool-caches-${{ runner.os }}-
+      - run: npx tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo
+      - run: npx eslint --cache --cache-location .eslintcache --cache-strategy content src app
+      - run: npx jest --ci --cacheDirectory "$RUNNER_TEMP/jest-cache"
 
   ios:
     needs: [prepare, gates]
@@ -166,6 +185,7 @@ jobs:
     env:
       CI: 'true'
       SKIP_GATES: '1' # the gates job already ran them
+      USE_CCACHE: '1' # the Podfile reads it (ahead of apple.ccacheEnabled): compile through ccache, see "Compiler cache"
       SANGEET_FREE_TEAM: '0'
       SANGEET_CARPLAY: '0' # 1 once Apple approves the CarPlay entitlement
       SANGEET_APPLE_TEAM: ${{ secrets.APPLE_TEAM }}
@@ -219,6 +239,20 @@ jobs:
           key: pods-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.config.ts', 'plugins/**', 'patches/**') }}
           restore-keys: pods-${{ runner.os }}-
 
+      # Compiler cache for the native build (React Native and the pods are most of it). Object files only, from code in
+      # this public repo and public packages; signing happens after compiling and never goes through it. Keyed by Xcode
+      # version: another compiler cannot use the old objects. A new copy is saved on every run, the closest one restored.
+      - name: Compiler cache
+        run: |
+          command -v ccache > /dev/null || HOMEBREW_NO_AUTO_UPDATE=1 brew install --quiet ccache
+          { echo "CCACHE_DIR=$HOME/.ccache-sangeet"; echo "CCACHE_MAXSIZE=2G"; } >> "$GITHUB_ENV"
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.ccache-sangeet
+          key: ccache-${{ runner.os }}-xcode${{ needs.prepare.outputs.xcode }}-${{ github.sha }}
+          restore-keys: ccache-${{ runner.os }}-xcode${{ needs.prepare.outputs.xcode }}-
+
       - name: Mask derived identifiers
         run: |
           # Secrets are masked by GitHub; values derived from them are not. The Firebase project number is part of the app ID.
@@ -251,6 +285,7 @@ jobs:
             echo "| Lane | \`$LANE\` |"
             echo "| Sent to | $where |"
             echo "| Xcode | $(xcodebuild -version | head -1) |"
+            echo "| ccache | $(ccache --print-stats 2>/dev/null | awk -F'\t' '$1=="direct_cache_hit"||$1=="preprocessed_cache_hit"{h+=$2} $1=="cache_miss"{m=$2} END{if (h+m) printf "%d hits, %d misses", h, m; else print "not used"}') |"
             echo "| Notes | CHANGELOG.md section for v${{ needs.prepare.outputs.version }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -297,15 +332,34 @@ jobs:
           node-version: 26
           cache: npm
 
+      # Dependencies, the wrapper and the build cache (compiled outputs; android-tv-release.sh builds with --build-cache).
+      # Nothing secret goes in: the keystore lives in android-keystore/ and signing/packaging tasks are not cacheable.
       - uses: actions/cache@v6
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.config.ts', 'plugins/**', 'patches/**') }}
+          key: gradle-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.config.ts', 'plugins/**', 'patches/**', 'modules/**') }}
           restore-keys: gradle-${{ runner.os }}-
 
       - run: npm ci --no-audit --no-fund
+
+      # The NDK React Native pins. Gradle downloads it (about 1 GB) when the runner image lacks that exact version;
+      # cache it only then, so a preinstalled one is never copied into the cache.
+      - name: NDK version
+        id: ndk
+        run: |
+          v=$(sed -n 's/^ndkVersion *= *"\(.*\)"/\1/p' node_modules/react-native/gradle/libs.versions.toml)
+          [ -n "$v" ] || { echo "::error::No ndkVersion in react-native's libs.versions.toml"; exit 1; }
+          pre=false; [ -f "$ANDROID_HOME/ndk/$v/source.properties" ] && pre=true
+          { echo "version=$v"; echo "path=$ANDROID_HOME/ndk/$v"; echo "preinstalled=$pre"; } >> "$GITHUB_OUTPUT"
+          echo "NDK $v (preinstalled on the runner: $pre)"
+
+      - if: steps.ndk.outputs.preinstalled != 'true'
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.ndk.outputs.path }}
+          key: ndk-${{ runner.os }}-${{ steps.ndk.outputs.version }}
 
       - name: Release keystore
         run: |

@@ -24,10 +24,30 @@ jobs:
         with:
           node-version: 26
           cache: npm
-      - run: npm ci --no-audit --no-fund
-      - run: npx tsc --noEmit
-      - run: npx eslint src app
-      - run: npx jest --ci
+      # node_modules as installed (postinstall patches applied), reused only for the exact lockfile, patches and Node
+      # version; on a miss npm ci installs from scratch and the result is saved.
+      - id: modules
+        uses: actions/cache@v6
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node26-${{ hashFiles('package-lock.json', 'patches/**') }}
+      - if: steps.modules.outputs.cache-hit != 'true'
+        run: npm ci --no-audit --no-fund
+      # tsc, eslint and jest caches. They only skip work for unchanged files, so a stale one is harmless; a new copy is
+      # saved on every run and the closest earlier one restored.
+      - uses: actions/cache@v6
+        with:
+          path: |
+            .tsbuildinfo
+            .eslintcache
+            ${{ runner.temp }}/jest-cache
+          key: tool-caches-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            tool-caches-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+            tool-caches-${{ runner.os }}-
+      - run: npx tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo
+      - run: npx eslint --cache --cache-location .eslintcache --cache-strategy content src app
+      - run: npx jest --ci --cacheDirectory "$RUNNER_TEMP/jest-cache"
 
   # A warning, never a failure: refactors, tests and docs need no changeset.
   changeset:

@@ -33,7 +33,9 @@ PREBUILD_ARGS=(-p android --no-install)
 [ "${SKIP_PREBUILD:-0}" = "1" ] || npx expo prebuild "${PREBUILD_ARGS[@]}"
 echo "sdk.dir=$ANDROID_HOME" > android/local.properties
 
-(cd android && ./gradlew assembleRelease -PreactNativeArchitectures="$ABIS")
+# --build-cache: reuse compiled outputs (Kotlin, Java, C++) from earlier builds in ~/.gradle/caches/build-cache-1, which
+# the Release workflow keeps between runs. Gradle keys entries by their inputs, so a changed file is always rebuilt.
+(cd android && ./gradlew assembleRelease --build-cache -PreactNativeArchitectures="$ABIS")
 
 mkdir -p dist
 cp android/app/build/outputs/apk/release/app-release.apk dist/sangeet-tv.apk
