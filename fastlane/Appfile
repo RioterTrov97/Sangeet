@@ -1,0 +1,2 @@
+app_identifier(ENV["SANGEET_BUNDLE_ID"]) if ENV["SANGEET_BUNDLE_ID"] && !ENV["SANGEET_BUNDLE_ID"].empty?
+team_id(ENV["APPLE_TEAM"]) if ENV["APPLE_TEAM"] && !ENV["APPLE_TEAM"].empty?

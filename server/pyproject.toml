@@ -1,0 +1,18 @@
+[project]
+name = "sangeet-server"
+version = "0.1.0"
+description = "Personal backup resolver/stream proxy for the Sangeet iOS app"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi==0.162.5",
+  "uvicorn[standard]==0.54.0",
+  "httpx==0.28.1",
+  "yt-dlp==2026.10.26",
+]
+
+[dependency-groups]
+dev = ["pytest==9.2.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

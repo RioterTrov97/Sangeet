@@ -1,0 +1,14 @@
+services:
+  sangeet-server:
+    build: .
+    container_name: sangeet-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"          # bind to the Tailscale address instead if you prefer: "100.x.y.z:8000:8000"
+    environment:
+      # Optional: choose your own token. Leave unset to have one generated on first run (see `docker compose logs`).
+      SANGEET_TOKEN: "${SANGEET_TOKEN:-}"
+    volumes:
+      - ./data:/data
+      # Optional, age-restricted videos. SENSITIVE: it is a login to your Google account. See README.
+      # - ./cookies.txt:/data/cookies.txt:ro

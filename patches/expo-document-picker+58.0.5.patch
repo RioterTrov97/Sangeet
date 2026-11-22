@@ -1,0 +1,62 @@
+diff --git a/node_modules/expo-document-picker/ios/DocumentPickerModule.swift b/node_modules/expo-document-picker/ios/DocumentPickerModule.swift
+index cdca147..4d02fba 100644
+--- a/node_modules/expo-document-picker/ios/DocumentPickerModule.swift
++++ b/node_modules/expo-document-picker/ios/DocumentPickerModule.swift
+@@ -10,16 +10,23 @@ struct PickingContext {
+ 
+ public class DocumentPickerModule: Module, PickingResultHandler {
+   private var pickingContext: PickingContext?
++  /// The picker on screen for `pickingContext`. A picker can vanish without calling its delegate (dismissed together with
++  /// the view controller it was presented over); then the context is stale and must not block every later open.
++  private weak var presentedPicker: UIViewController?
+ 
+   public func definition() -> ModuleDefinition {
+     Name("ExpoDocumentPicker")
+ 
+     AsyncFunction("getDocumentAsync") { (options: DocumentPickerOptions, promise: Promise) in
+-      if pickingContext != nil {
+-        throw PickingInProgressException()
++      if let stale = pickingContext {
++        if presentedPicker?.viewIfLoaded?.window != nil {
++          throw PickingInProgressException()
++        }
++        pickingContext = nil
++        stale.promise.resolve(DocumentPickerResponse(canceled: true))
+       }
+ 
+-      guard let currentVc = appContext?.utilities?.currentViewController() else {
++      guard appContext?.utilities?.currentViewController() != nil else {
+         throw MissingViewControllerException()
+       }
+ 
+@@ -32,12 +39,28 @@ public class DocumentPickerModule: Module, PickingResultHandler {
+       documentPickerVC.presentationController?.delegate = pickerDelegate
+       documentPickerVC.allowsMultipleSelection = options.multiple
+ 
+-      SceneGeometry.anchorPopover(of: documentPickerVC, to: currentVc.view)
+       documentPickerVC.modalPresentationStyle = .pageSheet
+-      currentVc.present(documentPickerVC, animated: true)
++      presentedPicker = documentPickerVC
++      presentWhenFree(documentPickerVC, attempts: 20)
+     }.runOnQueue(.main)
+   }
+ 
++  /// Presents over the top-most screen once nothing is being dismissed. Presented over a screen that is closing (a sheet the
++  /// user just picked "Import" in), the picker is torn down with it and never reports back.
++  private func presentWhenFree(_ picker: UIViewController, attempts: Int) {
++    guard presentedPicker === picker, let base = appContext?.utilities?.currentViewController() else { return }
++    var top = base
++    while let p = top.presentingViewController, top.isBeingDismissed { top = p }
++    let busy = top.isBeingDismissed || top.isBeingPresented || top.presentedViewController != nil
++    if busy && attempts > 0 {
++      DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in self?.presentWhenFree(picker, attempts: attempts - 1) }
++      return
++    }
++    NSLog("[DocumentPicker] presenting over %@ (presenting: %@, dismissing: %d, attempts left %d)", String(describing: type(of: top)), String(describing: top.presentingViewController.map { type(of: $0) }), top.isBeingDismissed ? 1 : 0, attempts)
++    SceneGeometry.anchorPopover(of: picker, to: top.view)
++    top.present(picker, animated: true)
++  }
++
+   func didPickDocumentsAt(urls: [URL]) {
+     guard let options = self.pickingContext?.options,
+       let promise = self.pickingContext?.promise

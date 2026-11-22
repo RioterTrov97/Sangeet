@@ -1,0 +1,5 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": { "modules": ["SangeetRemoteModule"] },
+  "android": { "modules": ["expo.modules.sangeetremote.SangeetRemoteModule"] }
+}

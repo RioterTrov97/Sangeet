@@ -1,0 +1,11 @@
+# Signing certificates and profiles live encrypted in a git repo (MATCH_GIT_URL). Settings come from ENV
+# (scripts/testflight.sh sources .env.local and .env.testflight): MATCH_GIT_URL, MATCH_PASSWORD, optional MATCH_GIT_BRANCH.
+# SANGEET_EXTRA_BUNDLE_IDS (comma-separated, optional) adds extension identifiers; each extension target then needs its own
+# profile mapping (match's sigh_<id>_appstore_profile-name ENV) in the Fastfile.
+storage_mode("git")
+git_url(ENV["MATCH_GIT_URL"])
+git_branch(ENV["MATCH_GIT_BRANCH"]) unless ENV["MATCH_GIT_BRANCH"].to_s.empty?
+type("appstore")
+ids = [ENV["SANGEET_BUNDLE_ID"].to_s] + ENV["SANGEET_EXTRA_BUNDLE_IDS"].to_s.split(",").map(&:strip)
+app_identifier(ids.reject(&:empty?))
+readonly(true)

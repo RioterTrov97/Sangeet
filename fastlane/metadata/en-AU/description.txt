@@ -1,0 +1,25 @@
+Sangeet is a music player for your iPhone. Search for songs, albums, artists and playlists, play them in the background, and keep the ones you love for offline listening.
+
+Playing
+- Home shelves, mood pages and search with suggestions
+- Now Playing with a queue you can reorder, shuffle and repeat
+- Synced lyrics that follow the song, from several lyrics sources, with a sync control when a line is early or late
+- Song and Video modes: switch to the music video when one exists, with full-screen landscape
+- Lock screen and Control Center controls
+
+Your library
+- Like songs, save albums, follow artists and make your own playlists
+- Download songs and albums to listen without a connection; recently played songs are cached automatically within a limit you choose
+- Songs from this iPhone: import audio files from the Files app, or drop them into the Sangeet folder, and they play like any other song
+- Import a public Spotify playlist or album and match it to songs you can play
+
+Accounts and privacy
+- You can search and play without signing in
+- Signing in with your YouTube Music account (through the sign-in page itself, never through a password field in the app) adds your own library and recommendations
+- No ads, no analytics and no tracking in the app
+
+Also
+- Control Sangeet on a Google TV from your phone (the TV app is a separate install)
+- An optional backup server that you host yourself can be added in Settings
+
+Sangeet is an independent app. It is not affiliated with or endorsed by YouTube or Google. Music is played from sources you can already reach, and availability depends on them.

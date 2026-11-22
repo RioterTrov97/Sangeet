@@ -1,0 +1,1 @@
+No sign-in is needed: search for any song and play it. Signing in with a YouTube Music account is optional and only adds the user's own library. CarPlay is not enabled in this build.

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Beamed eighth notes. Original artwork. `currentColor` is replaced per variant by scripts/build-icons.mjs. -->
+  <g fill="currentColor" transform="translate(-13 14)">
+    <ellipse cx="360" cy="738" rx="98" ry="74" transform="rotate(-22 360 738)"/>
+    <ellipse cx="690" cy="660" rx="98" ry="74" transform="rotate(-22 690 660)"/>
+    <rect x="414" y="262" width="44" height="476"/>
+    <rect x="744" y="184" width="44" height="476"/>
+    <polygon points="414,262 788,184 788,312 414,390"/>
+  </g>
+</svg>

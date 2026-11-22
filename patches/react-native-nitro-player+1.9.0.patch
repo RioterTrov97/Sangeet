@@ -1,0 +1,104 @@
+diff --git a/node_modules/react-native-nitro-player/ios/core/TrackPlayerListener.swift b/node_modules/react-native-nitro-player/ios/core/TrackPlayerListener.swift
+index d112479..0fc6569 100644
+--- a/node_modules/react-native-nitro-player/ios/core/TrackPlayerListener.swift
++++ b/node_modules/react-native-nitro-player/ios/core/TrackPlayerListener.swift
+@@ -14,7 +14,7 @@ extension TrackPlayerCore {
+     // Must be called on playerQueue
+     player = makeQueuePlayer()
+ 
+-    NitroPlayerLogger.log("TrackPlayerCore", "🎵 Gapless playback configured - automaticallyWaitsToMinimizeStalling=true (flipped to false once playback starts)")
++    NitroPlayerLogger.log("TrackPlayerCore", "🎵 Gapless playback configured - automaticallyWaitsToMinimizeStalling=true")
+ 
+     // Listen for EQ enabled/disabled changes so we can update ALL items in
+     // the queue atomically, keeping the audio pipeline configuration uniform.
+@@ -120,7 +120,7 @@ extension TrackPlayerCore {
+     // which would leave stall waiting on (no gapless) for the rest of the session. Time is
+     // advancing here, so playback is real.
+     if player.timeControlStatus == .playing,
+-      isRecoveringFromStall || player.automaticallyWaitsToMinimizeStalling {
++      isRecoveringFromStall {
+       clearStallRecovery()
+       emitStateChange()
+     }
+@@ -329,9 +329,8 @@ extension TrackPlayerCore {
+   /// for gapless inter-track transitions and drops the recovery flag. Must be called on
+   /// `playerQueue`.
+   func clearStallRecovery() {
+-    if player?.automaticallyWaitsToMinimizeStalling == true {
+-      player?.automaticallyWaitsToMinimizeStalling = false
+-    }
++    // Sangeet: stall waiting stays ON. With it off, AVQueuePlayer drops the rate to 0 (no reason given) when it starts loading
++    // the next queued item, even with the current song fully buffered: an audible stop-start ~0.5 s into every song.
+     isRecoveringFromStall = false
+     stallWatchdogRecoveries = 0
+   }
+diff --git a/node_modules/react-native-nitro-player/ios/media/MediaSessionManager.swift b/node_modules/react-native-nitro-player/ios/media/MediaSessionManager.swift
+index e224d7d..79e4db8 100644
+--- a/node_modules/react-native-nitro-player/ios/media/MediaSessionManager.swift
++++ b/node_modules/react-native-nitro-player/ios/media/MediaSessionManager.swift
+@@ -642,18 +642,63 @@ class MediaSessionManager {
+       return
+     }
+ 
+-    URLSession.shared.dataTask(with: imageUrl) { [weak self] data, _, _ in
+-      guard let data = data, let image = UIImage(data: data) else {
++    // Sangeet: a video's maxresdefault often does not exist; ytimg then answers 404 with a grey placeholder JPEG that
++    // decodes fine. Fall back to sddefault / hqdefault (4:3 with the 16:9 picture letterboxed) like the app's Artwork view.
++    var candidates = [imageUrl]
++    if url.contains("ytimg.com"), url.contains("/maxresdefault.") {
++      for alt in ["sddefault", "hqdefault"] {
++        if let u = URL(string: url.replacingOccurrences(of: "/maxresdefault.", with: "/\(alt).")) { candidates.append(u) }
++      }
++    }
++    fetchArtwork(candidates) { [weak self] raw, letterboxed in
++      guard let raw = raw else {
+         DispatchQueue.main.async { completion(nil) }
+         return
+       }
++      // Sangeet: video thumbnails are 16:9; the lock screen / CarPlay show artwork as is, so center-crop to a square.
++      let image = Self.squareCropped(letterboxed ? Self.letterboxCropped(raw) : raw)
+       DispatchQueue.main.async {
+         self?.artworkCache.setObject(image, forKey: url as NSString)
+         completion(image)
+       }
++    }
++  }
++
++  /// First candidate that loads with a 2xx (or from a file); `letterboxed` when it is an sd/hq frame with bars (an app-saved
++  /// copy of one is named `<id>-lb.jpg`).
++  private func fetchArtwork(_ urls: [URL], completion: @escaping (UIImage?, Bool) -> Void) {
++    guard let u = urls.first else { return completion(nil, false) }
++    URLSession.shared.dataTask(with: u) { [weak self] data, response, _ in
++      let status = (response as? HTTPURLResponse)?.statusCode ?? 200
++      if (200..<300).contains(status), let data = data, let image = UIImage(data: data) {
++        let p = u.path
++        return completion(image, p.contains("/hqdefault.") || p.contains("/sddefault.") || p.hasSuffix("/default.jpg") || p.hasSuffix("-lb.jpg"))
++      }
++      guard let self = self else { return completion(nil, false) }
++      self.fetchArtwork(Array(urls.dropFirst()), completion: completion)
+     }.resume()
+   }
+ 
++  /// The 16:9 band in the middle of a 4:3 YouTube frame (drops the black bars above and below).
++  static func letterboxCropped(_ image: UIImage) -> UIImage {
++    guard let cg = image.cgImage else { return image }
++    let w = cg.width, h = cg.height
++    let band = w * 9 / 16
++    guard band > 0, band < h, let c = cg.cropping(to: CGRect(x: 0, y: (h - band) / 2, width: w, height: band)) else { return image }
++    return UIImage(cgImage: c, scale: image.scale, orientation: image.imageOrientation)
++  }
++
++  /// Center square of a non-square image (unchanged when already within 2% of square).
++  static func squareCropped(_ image: UIImage) -> UIImage {
++    guard let cg = image.cgImage else { return image }
++    let w = cg.width, h = cg.height
++    let side = min(w, h)
++    guard side > 0, abs(w - h) > side / 50,
++      let c = cg.cropping(to: CGRect(x: (w - side) / 2, y: (h - side) / 2, width: side, height: side))
++    else { return image }
++    return UIImage(cgImage: c, scale: image.scale, orientation: image.imageOrientation)
++  }
++
+   func release() {
+     clearNowPlayingInfo()
+     disableAllCommands()

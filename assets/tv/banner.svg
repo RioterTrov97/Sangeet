@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360"><rect width="640" height="360" fill="#000"/><svg xmlns="http://www.w3.org/2000/svg" viewBox="190 140 740 740" x="64" y="60" width="240" height="240">
+  <!-- Beamed eighth notes. Original artwork. `#ffffff` is replaced per variant by scripts/build-icons.mjs. -->
+  <g fill="#ffffff" transform="translate(-13 14)">
+    <ellipse cx="360" cy="738" rx="98" ry="74" transform="rotate(-22 360 738)"/>
+    <ellipse cx="690" cy="660" rx="98" ry="74" transform="rotate(-22 690 660)"/>
+    <rect x="414" y="262" width="44" height="476"/>
+    <rect x="744" y="184" width="44" height="476"/>
+    <polygon points="414,262 788,184 788,312 414,390"/>
+  </g>
+</svg>
+<text x="330" y="200" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-weight="700" font-size="64" fill="#fff">Sangeet</text></svg>

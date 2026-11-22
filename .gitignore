@@ -1,0 +1,52 @@
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+# CNG: generated native dirs, never hand-edit
+/ios/
+/android/
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.DS_Store
+npm-debug.*
+coverage/
+
+# Backup server (local venv, token, cookies)
+server/.venv/
+server/data/
+server/cookies.txt
+__pycache__/
+*.pyc
+.pytest_cache/
+
+android-keystore/
+.env.android
+# Gradle output inside local Expo modules
+modules/*/android/build/
+modules/*/android/.cxx/
+.gradle/
+
+# Local device build settings (scripts/device-build.sh)
+.env.device
+
+# TestFlight (scripts/testflight.sh)
+.env.testflight
+vendor/
+.bundle/
+fastlane/report.xml
+fastlane/README.md
+build-number.txt
+
+# Identity values (bundle ID, team): scripts and Expo read it. Every env file is ignored except the examples.
+.env.local
+.env.*
+!.env*.example
+
+# Local agent settings
+.claude/

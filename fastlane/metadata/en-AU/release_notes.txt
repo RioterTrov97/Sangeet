@@ -1,0 +1,1 @@
+First version. Browse and search music, play with synced lyrics, switch to video, save songs for offline, and import songs and playlists.
