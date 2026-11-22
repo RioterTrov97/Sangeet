@@ -1,5 +1,5 @@
 import type { Track } from '../youtube/models';
-import { pushHistory, recentAlbums, recentArtists } from './history';
+import { mergeHistory, pushHistory, recentAlbums, recentArtists } from './history';
 
 jest.mock('../util/storage', () => ({ getJson: () => undefined, setJson: () => {} }));
 
@@ -27,3 +27,22 @@ describe('history', () => {
   });
 });
 
+
+describe('mergeHistory', () => {
+  const ids = (l: Track[]) => l.map((x) => x.id);
+  it('puts the 5 newest local plays first, then interleaves remote first', () => {
+    const local = ['l1', 'l2', 'l3', 'l4', 'l5', 'l6', 'l7'].map((i) => t(i));
+    const remote = ['r1', 'r2', 'l2', 'r3'].map((i) => t(i));
+    expect(ids(mergeHistory(local, remote))).toEqual(['l1', 'l2', 'l3', 'l4', 'l5', 'r1', 'l6', 'r2', 'l7', 'r3']);
+  });
+  it('caps and keeps local-only ids', () => {
+    const remote = Array.from({ length: 80 }, (_, i) => t(`r${i}`));
+    const out = mergeHistory([t('local:abc')], remote, 10);
+    expect(out).toHaveLength(10);
+    expect(out[0].id).toBe('local:abc');
+  });
+  it('works with an empty side', () => {
+    expect(ids(mergeHistory([], [t('a'), t('b')]))).toEqual(['a', 'b']);
+    expect(ids(mergeHistory([t('a')], []))).toEqual(['a']);
+  });
+});

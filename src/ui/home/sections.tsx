@@ -1,17 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FlashList } from '@shopify/flash-list';
 import { LayoutAnimation, Pressable, Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { router } from 'expo-router';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+
+import { useAuth } from '../../auth/store';
+import { useLibraryStore } from '../../library/store';
+import { Icon } from '../Icon';
 
 import { dedupeInto } from '../../home/layout';
 import { freshOnly, newFromFollowed } from '../../home/personalize';
 import { playTracks } from '../../player';
 import { playSong } from '../playSong';
-import type { Album, MusicItem, Track } from '../../youtube/models';
+import type { Album, MusicItem, Playlist, Track } from '../../youtube/models';
 import type { Mood } from '../../youtube/api';
 import { useBecause, useCharts, useFollowedReleases, useMoodShelf } from '../../youtube/queries';
 import { logWarn } from '../../util/log';
-import { trackSheet } from '../actions';
+import { playEntry, trackSheet } from '../actions';
 import { Card, SectionTitle } from '../Layout';
 import { Shelf } from '../Shelf';
 import { Skeleton } from '../States';
@@ -46,7 +51,7 @@ function ShelfSkeleton() {
   );
 }
 
-export type SectionId = 'topSongs' | 'newReleases' | 'videos' | 'popularArtists' | 'charts' | 'mood' | 'followedNew' | 'recent' | 'artists' | 'mixes' | 'because';
+export type SectionId = 'topSongs' | 'newReleases' | 'videos' | 'popularArtists' | 'charts' | 'mood' | 'followedNew' | 'recent' | 'artists' | 'mixes' | 'because' | 'library';
 
 /** Pre-computed (cross-shelf de-duplicated) content handed down by HomeScreen. */
 export type HomeContent = { topSongs: Track[]; newReleases: Album[]; videos: MusicItem[]; recent: Track[]; exclude: Set<string>; loading: boolean };
@@ -72,6 +77,8 @@ export function HomeSection({ id, personal, content, seed, mood }: { id: Section
       return <Shelf title="Your artists" items={personal.artistItems.slice(0, 12)} source="home-artists" />;
     case 'mixes':
       return <Mixes personal={personal} />;
+    case 'library':
+      return <LibraryShelves />;
     case 'because':
       return seed ? <Because seed={seed} recent={personal.recent} exclude={content.exclude} /> : null;
   }
@@ -142,7 +149,8 @@ function MoodSection({ mood, exclude }: { mood: Mood; exclude: Set<string> }) {
 
 /** Latest releases of followed artists (cached ~12h per artist); hidden until something recent shows up. */
 function FollowedNew({ personal, exclude }: { personal: Personal; exclude: Set<string> }) {
-  const { releases } = useFollowedReleases(personal.followed);
+  const signedIn = useAuth((s) => s.status === 'signedIn');
+  const { releases } = useFollowedReleases(personal.followed, signedIn ? 16 : 8); // signed in: subscriptions are followed artists too
   const items = useMemo(() => dedupeInto(newFromFollowed(releases, new Date().getFullYear() - 1), new Set(exclude), { min: 2 }), [releases, exclude]);
   return <Shelf title="New from artists you follow" items={items} source="home-followed" />;
 }
@@ -177,6 +185,36 @@ function Mixes({ personal }: { personal: Personal }) {
   );
 }
 
+const LIKED_SHOWN = 15;
+
+/** Signed in: the saved playlists and the first liked songs, each hidden with fewer than two items. */
+function LibraryShelves() {
+  const saved = useLibraryStore((s) => s.saved);
+  const liked = useLibraryStore((s) => s.liked);
+  const playlists = useMemo(() => saved.filter((x): x is Playlist => x.kind === 'playlist'), [saved]);
+  const likedShown = useMemo(() => liked.slice(0, LIKED_SHOWN), [liked]);
+  return (
+    <View>
+      {playlists.length >= 2 ? <Shelf title="Your playlists" items={playlists} source="home-playlists" /> : null}
+      {likedShown.length >= 2 ? <Shelf title="Liked songs" items={likedShown} source="home-liked" action="See all" onAction={() => router.push('/liked')} /> : null}
+    </View>
+  );
+}
+
+/** Full-width "Your Supermix" card: plays the account's supermix playlist from the start, radio continuing after it. */
+export function SupermixButton({ playlist }: { playlist: Playlist }) {
+  const { theme } = useUnistyles();
+  return (
+    <Pressable style={({ pressed }) => [styles.supermix, pressed && styles.pressed]} onPress={() => void playEntry(playlist)} accessibilityRole="button" accessibilityLabel="Play your Supermix, endless mix made for you">
+      <View style={styles.supermixText}>
+        <Text style={styles.supermixTitle}>Your Supermix</Text>
+        <Text style={styles.supermixSub}>Endless mix made for you</Text>
+      </View>
+      <Icon name="play.fill" size={20} tintColor={theme.colors.accent} />
+    </Pressable>
+  );
+}
+
 const Gap = () => <View style={styles.gap} />;
 
 const styles = StyleSheet.create((theme) => ({
@@ -185,6 +223,11 @@ const styles = StyleSheet.create((theme) => ({
   skel: { height: SHELF_H, padding: theme.spacing.lg, gap: theme.spacing.md },
   skelTrack: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md },
   skelRow: { flexDirection: 'row', gap: theme.spacing.md },
+  supermix: { flexDirection: 'row', alignItems: 'center', marginHorizontal: theme.spacing.lg, marginTop: theme.spacing.md, padding: theme.spacing.lg, borderRadius: theme.radii.sm, backgroundColor: theme.colors.surfaceElevated },
+  supermixText: { flex: 1, gap: 2 },
+  supermixTitle: { color: theme.colors.text, ...theme.typography.heading },
+  supermixSub: { color: theme.colors.textSecondary, ...theme.typography.caption },
+  pressed: { opacity: 0.7 },
   more: { alignSelf: 'center', paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg },
   moreText: { color: theme.colors.textSecondary, ...theme.typography.heading },
 }));

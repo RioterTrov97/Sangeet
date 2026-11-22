@@ -3,6 +3,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Icon } from './Icon';
 import { Alert, Share } from 'react-native';
 
+import { isSignedIn, syncYtLibrary, useAuth } from '../auth/store';
+import { addableYtPlaylists } from '../library/ytPlaylists';
 import { removeAutoCached, isAutoCached, autoCachedTracks } from '../downloads/autoCache';
 import { downloadedGroups, downloadTracks, getDownloadRow, removeDownload, retryDownload, downloadedTracks, type GroupInfo } from '../downloads/manager';
 import { togglePin, isPinned } from '../library/pins';
@@ -30,7 +32,7 @@ import { knownVideoId } from '../video/counterpart';
 import { watchVideo } from '../video/controller';
 import { isPlayerOpen } from './playerOpen';
 import { showNotice } from '../util/notice';
-import { getAlbum, getArtist, getPlaylist } from '../youtube/api';
+import { addToYtPlaylist, createYtPlaylist, getAlbum, getArtist, getPlaylist } from '../youtube/api';
 import { queryClient } from '../youtube/queryClient';
 import type { Artwork, MusicItem, Track } from '../youtube/models';
 import { itemSubtitle, itemTitle } from './itemText';
@@ -155,26 +157,64 @@ export function addToPlaylistPage(getTracks: () => Promise<Track[]>, suggestedNa
       showNotice("Couldn't load the songs");
     }
   };
+  const addYt = async (id: string, name: string) => {
+    try {
+      const tracks = await getTracks();
+      if (!tracks.some((t) => !isLocalId(t.id))) return void showNotice('Songs from this phone can only go in playlists on this phone');
+      const n = await addToYtPlaylist(id, tracks.map((t) => t.id));
+      void queryClient.invalidateQueries({ queryKey: ['yt', 'inf-playlist', id] });
+      showNotice(`Added ${n} song${n === 1 ? '' : 's'} to ${name}`);
+    } catch {
+      showNotice(`Couldn't add to ${name}`);
+    }
+  };
+  const newLocal = () =>
+    Alert.prompt('New playlist', undefined, async (name) => {
+      if (!name?.trim()) return;
+      try {
+        const tracks = await getTracks();
+        createLocalPlaylist(name, tracks);
+        showNotice(`Created ${name.trim()}`);
+      } catch {
+        showNotice("Couldn't load the songs");
+      }
+    }, 'plain-text', suggestedName);
+  const newYt = () =>
+    Alert.prompt('New playlist on YouTube Music', undefined, async (name) => {
+      if (!name?.trim()) return;
+      try {
+        const tracks = await getTracks();
+        if (!tracks.some((t) => !isLocalId(t.id))) return void showNotice('Songs from this phone can only go in playlists on this phone');
+        await createYtPlaylist(name, tracks.map((t) => t.id));
+        showNotice(`Created ${name.trim()} on YouTube Music`);
+        void syncYtLibrary();
+      } catch {
+        showNotice("Couldn't create the playlist");
+      }
+    }, 'plain-text', suggestedName);
+  const signedIn = isSignedIn();
+  const { saved, ytKeys } = libraryState();
+  const ytLists = signedIn ? addableYtPlaylists(saved, ytKeys, useAuth.getState().account?.name) : [];
+  const local = libraryState().playlists.map((p): SheetAction => ({ id: `pl:${p.id}`, label: p.name, icon: 'music.note.list', onPress: () => add(p.id, p.name) }));
   return {
     title: 'Add to playlist',
     actions: [
-      {
-        id: 'newpl',
-        label: 'New playlist…',
-        icon: 'plus',
-        onPress: () =>
-          Alert.prompt('New playlist', undefined, async (name) => {
-            if (!name?.trim()) return;
-            try {
-              const tracks = await getTracks();
-              createLocalPlaylist(name, tracks);
-              showNotice(`Created ${name.trim()}`);
-            } catch {
-              showNotice("Couldn't load the songs");
-            }
-          }, 'plain-text', suggestedName),
-      },
-      ...libraryState().playlists.map((p): SheetAction => ({ id: `pl:${p.id}`, label: p.name, icon: 'music.note.list', onPress: () => add(p.id, p.name) })),
+      signedIn
+        ? {
+            id: 'newpl',
+            label: 'New playlist…',
+            icon: 'plus',
+            sub: {
+              title: 'New playlist',
+              actions: [
+                { id: 'newpl:yt', label: 'On YouTube Music', icon: 'music.note.list', onPress: newYt },
+                { id: 'newpl:local', label: 'On this phone', icon: 'iphone', onPress: newLocal },
+              ],
+            },
+          }
+        : { id: 'newpl', label: 'New playlist…', icon: 'plus', onPress: newLocal },
+      ...ytLists.map((p): SheetAction => ({ id: `ytpl:${p.id}`, label: `${p.title} (YouTube Music)`, icon: 'music.note.list', onPress: () => addYt(p.id, p.title) })),
+      ...local,
     ],
   };
 }

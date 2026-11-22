@@ -1,5 +1,5 @@
 import type { Album, Shelf, Track } from '../youtube/models';
-import { dedupeInto, filterFeed, homeOrder, itemKey, mergeReleases, mixQuickPicks, uniqueItems, ytQuickPicks } from './layout';
+import { accountFeed, dedupeInto, findSupermix, filterFeed, homeOrder, itemKey, mergeReleases, mixQuickPicks, uniqueItems, ytQuickPicks } from './layout';
 
 const art = [{ url: 'u', width: 1, height: 1 }];
 const tr = (id: string, withArt = true): Track => ({ kind: 'track', id, title: id, artists: [{ id: 'UC', name: 'A' }], artwork: withArt ? art : [] });
@@ -71,5 +71,50 @@ describe('order', () => {
     expect(homeOrder(false, false).slice(0, 3)).toEqual(['quick', 'topSongs', 'newReleases']);
     expect(homeOrder(true, true).slice(0, 8)).toEqual(['quick', 'recent', 'because', 'topSongs', 'followedNew', 'artists', 'mixes', 'newReleases']);
     expect(homeOrder(true, false)).not.toContain('followedNew');
+  });
+});
+
+describe('signed in', () => {
+  const base = { trending: [], personalised: true, top: [], followed: [], signedIn: true };
+  it('quick picks: YT first, all of them up to 20, local recent fills gaps', () => {
+    const out = mixQuickPicks({ ...base, yt: many('q', 25), recent: many('r', 3) });
+    expect(ids(out)).toEqual(many('q', 20).map((t) => t.id));
+    const few = mixQuickPicks({ ...base, yt: many('q', 3).concat(tr('noart', false)), recent: [tr('q1'), tr('r0')] });
+    expect(ids(few)).toEqual(['q0', 'q1', 'q2', 'r0']);
+  });
+  it('falls back to the normal mix without YT quick picks', () => {
+    expect(mixQuickPicks({ ...base, yt: [], recent: many('r', 2) }).length).toBeGreaterThan(0);
+  });
+  it('order', () => {
+    expect(homeOrder(true, true, true)).toEqual(['quick', 'supermix', 'account', 'recent', 'because', 'library', 'followedNew', 'artists', 'mixes', 'topSongs', 'newReleases', 'videos', 'popularArtists', 'charts', 'mood']);
+    expect(homeOrder(true, false, true)).not.toContain('followedNew');
+    expect(homeOrder(true, false, true)).not.toContain('feed');
+  });
+  it('account shelves keep mix / listen again shelves and say which of ours to hide', () => {
+    const feed: Shelf[] = [
+      { title: 'Quick picks', items: many('q', 5) },
+      { title: 'Listen again', items: many('l', 5) },
+      { title: 'Mixed for you', items: many('m', 5) },
+      { title: 'Mixed for you', items: many('n', 5) },
+      { title: 'Empty', items: [] },
+      { title: 'Albums for you', items: [...many('l', 2), tr('l0')] },
+    ];
+    const out = accountFeed(feed);
+    expect(out.shelves.map((s) => s.title)).toEqual(['Listen again', 'Mixed for you', 'Albums for you']);
+    expect(ids(out.shelves[2].items)).toEqual(['l0', 'l1']);
+    expect(out.hideMixes).toBe(true);
+    expect(out.hideRecent).toBe(true);
+    const plain = accountFeed([{ title: 'Forgotten favorites', items: many('f', 3) }]);
+    expect(plain.hideMixes || plain.hideRecent).toBe(false);
+  });
+  it('supermix finder', () => {
+    const pl = (id: string, title: string): Shelf['items'][number] => ({ kind: 'playlist', id, title, artwork: art });
+    const feed: Shelf[] = [
+      { title: 'Mixed for you', items: [pl('m1', 'My Mix 1'), pl('m2', 'My Mix 2')] },
+      { title: 'Other', items: [tr('x'), pl('s', 'Your Supermix')] },
+    ];
+    expect(findSupermix(feed)?.id).toBe('s');
+    expect(findSupermix([feed[0]])?.id).toBe('m1');
+    expect(findSupermix([{ title: 'Chill', items: [pl('c', 'Chill')] }])).toBeUndefined();
   });
 });

@@ -5,8 +5,11 @@ import { localeSessionOptions, onContentLocaleChange } from './contentLocale';
 import { createLimiter, type Priority } from './limiter';
 import 'event-target-polyfill';
 import 'react-native-url-polyfill/auto';
+import './cryptoPolyfill';
+import { authedFetch } from './authedFetch';
 import { Innertube, Parser, YTNodes } from 'youtubei.js/react-native';
 
+import { isLocalId } from '../local/id';
 import { log, timed } from '../util/log';
 import { queryClient } from './queryClient';
 import type { Album, AlbumPage, Artist, ArtistPage, Playlist, MusicItem, Page, PlaylistPage, SearchType, Shelf, Track, ArtistRef } from './models';
@@ -23,6 +26,7 @@ import {
   mapUpNext,
 } from './mappers/pages';
 import { mapItems } from './mappers/items';
+import { flattenHistory, mapRecap, parseAccountItem, parseAccountMenu, type AccountInfo, type RecapPage } from './mappers/account';
 
 /**
  * Single reused InnerTube session. youtubei.js runs in Hermes for the Music data endpoints only
@@ -46,8 +50,28 @@ export function setAuthErrorHandler(fn: (() => void) | undefined): void {
   onAuthError = fn;
 }
 
+const ownCookiesFetch: typeof fetch = (input, init) => authedFetch(fetch)(input, init);
+
+/**
+ * A second signed-in session, only for adding plays to the account's history. Reporting needs the player response's
+ * tracking URLs, and YouTube answers the player request "UNPLAYABLE, page needs to be reloaded" without the
+ * signatureTimestamp, which only the downloaded player script provides. The main session skips that download, so this
+ * one is created on the first report (a few seconds, in the background) and reused while the cookie stays the same.
+ */
+let reportSession: Promise<Innertube> | undefined;
+let reportSessionCookie: string | undefined;
+function getReportSession(): Promise<Innertube> {
+  if (reportSessionCookie !== authCookie) reportSession = undefined;
+  reportSessionCookie = authCookie;
+  reportSession ??= Innertube.create({ retrieve_player: true, generate_session_locally: true, ...localeSessionOptions(), cookie: authCookie, fetch: ownCookiesFetch }).catch((e) => {
+    reportSession = undefined;
+    throw e;
+  });
+  return reportSession;
+}
+
 export function getSession(): Promise<Innertube> {
-  sessionPromise ??= Innertube.create({ retrieve_player: false, generate_session_locally: true, ...localeSessionOptions(), ...(authCookie ? { cookie: authCookie } : {}) }).catch((e) => {
+  sessionPromise ??= Innertube.create({ retrieve_player: false, generate_session_locally: true, ...localeSessionOptions(), ...(authCookie ? { cookie: authCookie, fetch: ownCookiesFetch } : {}) }).catch((e) => {
     sessionPromise = undefined;
     throw e;
   });
@@ -154,7 +178,7 @@ export async function getVideoCounterpart(videoId: string): Promise<string | nul
       }
     }
     try {
-      const info: any = await yt.music.getInfo(videoId);
+      const info = await yt.music.getInfo(videoId);
       const counterpart = findKey(info?.page, 'counterpart');
       const alt = (Array.isArray(counterpart) ? counterpart[0]?.video_id : undefined) as string | undefined;
       if (alt && alt !== videoId) return alt;
@@ -423,6 +447,63 @@ export async function getMoodPage(params: string, browseId = MOODS_PAGE): Promis
 
 // ---- signed-in only ----
 
+/** The signed-in account's name, handle and photo (YT Music account menu). Null when signed out or nothing parses. */
+export async function getAccountInfo(): Promise<AccountInfo | null> {
+  if (!authCookie) return null;
+  return q('getAccountInfo', async () => {
+    const yt: any = await getSession();
+    try {
+      const res: any = await yt.actions.execute('/account/account_menu', { client: 'YTMUSIC' });
+      const info = parseAccountMenu(res?.data);
+      if (info) return info;
+    } catch (e) {
+      if (/status code (401|403)\b/.test(e instanceof Error ? e.message : String(e))) throw e;
+      log('api', 'account menu failed, trying account.getInfo');
+    }
+    try {
+      const info: any = await yt.account.getInfo();
+      return parseAccountItem(info?.contents?.contents?.[0]);
+    } catch {
+      return null;
+    }
+  });
+}
+
+/** The account's play history across all devices (Today, Yesterday, ...), newest first, deduped, at most 100. Empty when anonymous. */
+export async function getYtHistory(): Promise<Track[]> {
+  if (!authCookie) return [];
+  return q('getYtHistory', async () => {
+    const yt: any = await getSession();
+    const res: any = await yt.actions.execute('/browse', { browseId: 'FEmusic_history', client: 'YTMUSIC' });
+    const parsed: any = Parser.parseResponse(res.data);
+    return flattenHistory(parsed.contents_memo?.getType(YTNodes.MusicShelf), 100);
+  });
+}
+
+/** The YT Music Recap page (header + carousels). Null when it is not available for this account. Signed in only. */
+export async function getRecap(): Promise<RecapPage | null> {
+  if (!authCookie) return null;
+  return q('getRecap', async () => {
+    try {
+      return mapRecap(await (await getSession()).music.getRecap());
+    } catch (e) {
+      // No Recap yet (new or quiet account): YouTube sends a message page that youtubei.js refuses to parse.
+      if (/Cannot cast Message/i.test(e instanceof Error ? e.message : String(e))) return null;
+      throw e;
+    }
+  });
+}
+
+/** The Recap playlist's tracks, for the "Play your Recap" button. */
+export async function getRecapTracks(): Promise<Track[]> {
+  if (!authCookie) return [];
+  return q('getRecapTracks', async () => {
+    const recap = await (await getSession()).music.getRecap();
+    const pl: any = await recap.getPlaylist();
+    return mapPlaylistTracks(pl?.items);
+  });
+}
+
 export type YtLibrary = {
   liked: Track[];
   playlists: Playlist[];
@@ -519,10 +600,36 @@ export async function setYtSubscribe(artist: Pick<Artist, 'id' | 'channelId'>, o
   });
 }
 
-/** Adds a played track to the account's YouTube watch history (only when the user enabled it). */
+const ytIds = (ids: string[]): string[] => [...new Set(ids.filter((id) => id && !isLocalId(id)))];
+
+/** Adds songs to one of the account's YouTube Music playlists (songs from this phone are skipped). Returns how many ids were sent; throws on failure. */
+export async function addToYtPlaylist(playlistId: string, videoIds: string[]): Promise<number> {
+  const ids = ytIds(videoIds);
+  if (!ids.length) throw new Error('nothing to add');
+  await q(`addToPlaylist ${playlistId}`, async () => {
+    const yt = await getSession();
+    await yt.playlist.addVideos(playlistId, ids);
+  });
+  return ids.length;
+}
+
+/** Creates a private YouTube Music playlist holding the songs (those from this phone are skipped). Returns its id; throws on failure. */
+export async function createYtPlaylist(title: string, videoIds: string[]): Promise<string | undefined> {
+  const ids = ytIds(videoIds);
+  if (!ids.length) throw new Error('nothing to add');
+  return q(`createPlaylist`, async () => {
+    const yt = await getSession();
+    const res = await yt.playlist.create(title.trim(), ids, 'PRIVATE');
+    if (!res.success) throw new Error(`create playlist failed (${res.status_code})`);
+    return res.playlist_id;
+  });
+}
+
+/** Adds a played track to the account's YouTube watch history (on by default when signed in; Settings can turn it off). */
 export async function reportYtPlayback(videoId: string): Promise<void> {
   await q(`reportPlayback ${videoId}`, async () => {
-    const info = await (await getSession()).music.getInfo(videoId);
+    const yt = await getReportSession();
+    const info = await yt.music.getInfo(videoId);
     await info.addToWatchHistory();
   });
 }

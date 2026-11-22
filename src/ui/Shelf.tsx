@@ -10,11 +10,11 @@ import { openItem } from './nav';
 import { itemSubtitle, itemTitle } from './itemText';
 
 /** Title + horizontal FlashList of cards. Tracks play (and start radio); other kinds open their page. */
-export function Shelf({ title, items, source = 'shelf', size = 140 }: { title: string; items: MusicItem[]; source?: string; size?: number }) {
+export function Shelf({ title, items, source = 'shelf', size = 140, action, onAction }: { title: string; items: MusicItem[]; source?: string; size?: number; /** Optional link on the title row (e.g. See all). */ action?: string; onAction?: () => void }) {
   if (!items.length) return null;
   return (
     <View>
-      <SectionTitle title={title} />
+      <SectionTitle title={title} action={action} onAction={onAction} />
       <FlashList
         horizontal
         data={items}

@@ -14,9 +14,9 @@ https://github.com/<owner>/<repo>/releases/latest/download/sangeet-android.apk
 1. On the TV, install **Downloader** (by AFTVnews) from the Play Store.
 2. Settings > Apps > Security & restrictions (Google TV: Settings > System > Privacy > Security & restrictions) >
    **Unknown sources**: allow **Downloader**.
-3. Open Downloader and enter the link above, or a short Downloader code for it. Codes are made once at AFTVnews'
-   link shortener (`go.aftvnews.com`, free account). Because the link never changes, the code keeps working for every
-   release. A code is public: anyone who enters it gets the APK, the same as the link.
+3. Open Downloader and enter the code **`5597951`** (or the link above). The code points at the link above, which
+   never changes, so it keeps working for every release. A code is public: anyone who enters it gets the APK, the same
+   as the link. (It was made at AFTVnews' link shortener, `go.aftvnews.com`.)
 4. Downloader fetches the APK and opens Android's installer. Choose **Install**, then **Open**. Delete the APK when
    Downloader offers it.
 

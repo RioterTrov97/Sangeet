@@ -28,6 +28,7 @@ import { APP_ICONS, chooseIcon, currentIcon, iconsSupported } from './appIcon';
 import { setMatchColors, usePaletteStore } from './palette/store';
 import { setAllowLyric, useVideoSettings } from '../video/settings';
 import { Header, Screen, useScreenTop } from './Layout';
+import { AccountAvatar } from './AvatarMenu';
 import { confirmSheet } from './sheet';
 
 
@@ -40,16 +41,24 @@ function AccountNote() {
 
 function AccountSection() {
   const { theme } = useUnistyles();
-  const { status, reportHistory, syncing } = useAuth();
+  const { status, reportHistory, syncing, account } = useAuth();
   return (
     <View style={styles.about}>
       {status === 'signedIn' ? (
         <>
+          <View style={styles.srcRow}>
+            <AccountAvatar size={40} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title}>{account?.name ?? 'YouTube Music'}</Text>
+              {account?.handle ? <Text style={styles.note}>{account.handle}</Text> : null}
+            </View>
+          </View>
           <Text style={styles.aboutText}>Signed in to YouTube Music. Home is personalised and your playlists, liked songs and artists appear in Library. Likes sync to your account.</Text>
           <View style={styles.srcRow}>
             <Text style={styles.title}>Add played songs to YouTube history</Text>
             <Switch value={reportHistory} onValueChange={setReportHistory} accessibilityLabel="Report playback to YouTube history" trackColor={{ true: theme.colors.accent }} />
           </View>
+          <Text style={styles.note}>Songs you play here appear in your YouTube history, so YouTube Music can tune your Quick picks and mixes. Turn off to keep them on this phone only.</Text>
           <Pressable style={styles.btn} onPress={() => void syncYtLibrary()} accessibilityRole="button" accessibilityLabel="Sync library now">
             <Text style={styles.btnText}>{syncing ? 'Syncing…' : 'Sync library now'}</Text>
           </Pressable>

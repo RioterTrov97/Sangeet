@@ -390,7 +390,7 @@ jobs:
             echo
             echo "---"
             [ "${{ needs.ios.result }}" = success ] && echo "- iPhone: sent to testers (${{ needs.prepare.outputs.ios == 'adhoc' && 'Firebase App Distribution' || 'TestFlight' }})."
-            [ "${{ needs.android.result }}" = success ] && echo "- Android: \`sangeet-android-v$V.apk\` below. One APK for Android phones and Android TV: open it on the phone (allow installs from your browser or file manager), or sideload it on a TV with adb install -r. Later updates install from inside the app."
+            [ "${{ needs.android.result }}" = success ] && echo "- Android: \`sangeet-android-v$V.apk\` below. One APK for Android phones and Android TV: open it on the phone (allow installs from your browser or file manager), or on a TV open the Downloader app (by AFTVnews) and enter code 5597951. Later updates install from inside the app."
           } >> "$RUNNER_TEMP/notes.md"
           # A second copy under a fixed name: https://github.com/<owner>/<repo>/releases/latest/download/sangeet-android.apk always
           # serves the newest APK, so a TV's Downloader code (or any bookmark) never has to change. Every release is marked latest.

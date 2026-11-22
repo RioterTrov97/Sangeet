@@ -9,13 +9,14 @@ import { useAutoCache } from '../downloads/autoCache';
 import { useDownloads } from '../downloads/manager';
 import { useIsOffline } from '../downloads/net';
 import { playSong } from './playSong';
-import type { Album, MusicItem, Shelf as ShelfModel, Track } from '../youtube/models';
+import type { Album, MusicItem, Playlist, Shelf as ShelfModel, Track } from '../youtube/models';
 import { pickMoods } from '../home/discover';
-import { dedupeInto, filterFeed, homeOrder, itemKey, mergeReleases, mixQuickPicks, ytQuickPicks } from '../home/layout';
+import { accountFeed, dedupeInto, filterFeed, findSupermix, homeOrder, itemKey, mergeReleases, mixQuickPicks, ytQuickPicks } from '../home/layout';
 import { boostLiked } from '../home/personalize';
 import { logWarn } from '../util/log';
 import type { Mood } from '../youtube/api';
-import { deviceRegion, useExplore, useHome, useHomeMore, useMoods } from '../youtube/queries';
+import { mergeHistory } from '../player/history';
+import { deviceRegion, useExplore, useHome, useHomeMore, useMoods, useYtHistory } from '../youtube/queries';
 import { Artwork } from './Artwork';
 import { itemSubtitle, itemTitle } from './itemText';
 import { Screen, TabHeader, useTabTop } from './Layout';
@@ -24,7 +25,8 @@ import { Chip } from './Controls';
 import { openItem } from './nav';
 import { AnimatedFlashList, useScrollY } from './scroll';
 import { Shelf } from './Shelf';
-import { HomeSection, type HomeContent, type SectionId } from './home/sections';
+import { QuickPages } from './home/QuickPages';
+import { HomeSection, SupermixButton, type HomeContent, type SectionId } from './home/sections';
 import { usePersonal } from './home/usePersonal';
 import { isOfflineRow, OfflineRowView, offlineRows, type OfflineRow } from './home/OfflineHome';
 
@@ -39,7 +41,7 @@ export function greeting(hour = new Date().getHours()): string {
   return 'Good evening';
 }
 
-type Row = OfflineRow | { type: 'quick'; items: MusicItem[] } | { type: 'banner'; kind: 'expired' } | { type: 'shelf'; shelf: ShelfModel } | { type: 'skeleton' } | { type: 'section'; id: SectionId; seed?: Track; mood?: Mood; key: string };
+type Row = OfflineRow | { type: 'quick'; items: MusicItem[]; signedIn: boolean } | { type: 'supermix'; playlist: Playlist } | { type: 'banner'; kind: 'expired' } | { type: 'shelf'; shelf: ShelfModel } | { type: 'skeleton' } | { type: 'section'; id: SectionId; seed?: Track; mood?: Mood; key: string };
 
 function QuickTile({ item }: { item: MusicItem }) {
   const sub = item.kind === 'track' || item.kind === 'artist' ? itemSubtitle(item) : undefined;
@@ -75,10 +77,12 @@ export function HomeScreen() {
   };
   const { scrollY, onScroll } = useScrollY();
   const offline = useIsOffline();
+  const signedIn = useAuth((s) => s.status === 'signedIn');
   const expired = useAuth((s) => s.status === 'expired');
   const dlRev = useDownloads((s) => s.rev);
   const savedBytes = useAutoCache((s) => s.bytes);
   const personal = usePersonal();
+  const remoteHistory = useYtHistory().data;
   const explore = useExplore();
   const moodTiles = useMoods().data;
   const moods = useMemo(() => pickMoods(moodTiles, deviceRegion(), 3), [moodTiles]);
@@ -102,36 +106,44 @@ export function HomeScreen() {
       top: personal.artists.map((a) => a.topTrack),
       followed: personal.followed,
       avoid: top3,
+      signedIn,
     });
     // Everything shown so far; later shelves drop repeats (kept as-is when too little would remain).
     const seen = new Set<string>([...quick.map(itemKey), ...top3]);
-    const recent = personal.personalised ? dedupeInto(personal.recent, seen, { min: 4 }) : [];
+    const recentSrc = signedIn && remoteHistory?.length ? mergeHistory(personal.recent, remoteHistory, 20) : personal.recent;
+    const recent = personal.personalised || (signedIn && recentSrc.length >= 2) ? dedupeInto(recentSrc, seen, { min: 4 }) : [];
     const releases = mergeReleases(boostLiked(ex?.newAlbums?.length || ex?.newSingles?.length ? (ex?.newAlbums ?? []) : (ex?.newReleases ?? []).filter((i): i is Album => i.kind === 'album'), liked, 3), boostLiked(ex?.newSingles ?? [], liked, 3));
     const videos = dedupeInto(ex?.videos ?? [], seen, { min: 3 });
     for (const r of releases) seen.add(itemKey(r));
     const exclude = new Set(seen);
     const content: HomeContent = { topSongs, newReleases: releases, videos, recent, exclude, loading: !ex && !explore.isError };
     const sec = (id: SectionId, seed?: Track, mood?: Mood): Row => ({ type: 'section', id, seed, mood, key: `${id}-${seed?.id ?? mood?.title ?? ''}` });
-    const feedShelves = data ? filterFeed([...data, ...more.shelves.filter((m) => !data.some((d) => d.title === m.title))], new Set(seen), ['Quick picks']) : [];
+    const fullFeed = data ? [...data, ...more.shelves.filter((m) => !data.some((d) => d.title === m.title))] : [];
+    const account = signedIn ? accountFeed(fullFeed) : undefined;
+    const feedShelves = account ? account.shelves : data ? filterFeed(fullFeed, new Set(seen), ['Quick picks']) : [];
+    const supermix = signedIn ? findSupermix(fullFeed) : undefined;
     const rows: Row[] = [...banner];
-    if (quick.length) rows.push({ type: 'quick', items: quick });
+    if (quick.length) rows.push({ type: 'quick', items: quick, signedIn: signedIn && ytQuickPicks(data).length > 0 });
     else if (isLoading) rows.push({ type: 'skeleton' });
-    for (const id of homeOrder(personal.personalised, personal.followed.length > 0)) {
+    for (const id of homeOrder(personal.personalised, personal.followed.length > 0, signedIn)) {
       if (id === 'quick') continue;
-      if (id === 'recent') personal.personalised && recent.length >= 2 && rows.push(sec('recent'));
+      if (id === 'supermix') supermix && rows.push({ type: 'supermix', playlist: supermix });
+      else if (id === 'account') feedShelves.forEach((shelf) => rows.push({ type: 'shelf', shelf }));
+      else if (id === 'library') rows.push(sec('library'));
+      else if (id === 'recent') (personal.personalised || signedIn) && recent.length >= 2 && !account?.hideRecent && rows.push(sec('recent'));
       else if (id === 'because') personal.personalised && personal.seeds.forEach((t) => rows.push(sec('because', t)));
-      else if (id === 'mixes') personal.personalised && rows.push(sec('mixes'));
+      else if (id === 'mixes') personal.personalised && !account?.hideMixes && rows.push(sec('mixes'));
       else if (id === 'artists') (personal.personalised || personal.followed.length) && rows.push(sec('artists'));
       else if (id === 'mood') moods.slice(0, 3).forEach((m) => rows.push(sec('mood', undefined, m)));
-      else if (id === 'feed') feedShelves.forEach((shelf) => rows.push({ type: 'shelf', shelf }));
+      else if (id === 'feed') !signedIn && feedShelves.forEach((shelf) => rows.push({ type: 'shelf', shelf }));
       else rows.push(sec(id));
     }
     return { rows, content };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, isLoading, offline, expired, dlRev, savedBytes, personal, isError, explore.isError, ex, moods, more.shelves]);
+  }, [data, isLoading, offline, expired, signedIn, dlRev, savedBytes, personal, isError, explore.isError, ex, moods, more.shelves, remoteHistory]);
   const topInset = useTabTop(!offline); // offline: no For you / Discover bar, so no room for it
   const [tab, setTab] = useState<'foryou' | 'discover'>('foryou');
-  const shown = useMemo(() => (offline ? rows : rows.filter((r) => (r.type === 'section' && DISCOVER.has(r.id) ? tab === 'discover' : r.type === 'shelf' || r.type === 'quick' || r.type === 'section' || r.type === 'skeleton' ? tab === 'foryou' : true))), [rows, tab, offline]);
+  const shown = useMemo(() => (offline ? rows : rows.filter((r) => (r.type === 'section' && DISCOVER.has(r.id) ? tab === 'discover' : r.type === 'shelf' || r.type === 'quick' || r.type === 'supermix' || r.type === 'section' || r.type === 'skeleton' ? tab === 'foryou' : true))), [rows, tab, offline]);
   return (
     <Screen top="under">
       <AnimatedFlashList
@@ -144,13 +156,17 @@ export function HomeScreen() {
         onEndReached={() => more.hasNextPage && !more.isFetchingNextPage && void more.fetchNextPage()}
         onEndReachedThreshold={1.5}
         keyExtractor={(r: Row, i: number) => (r.type === 'shelf' ? `s-${r.shelf.title}-${i}` : r.type === 'section' ? `sec-${r.key}` : r.type === 'offlineSong' ? r.key : r.type === 'offlineHead' ? `h-${r.title}` : r.type)}
-        getItemType={(r: Row) => (r.type === 'section' ? `section-${r.id}` : r.type)}
+        getItemType={(r: Row) => (r.type === 'section' ? `section-${r.id}` : r.type === 'quick' && r.signedIn ? 'quickPaged' : r.type)}
         ListEmptyComponent={isError && explore.isError ? <ErrorState message="Could not load Home" onRetry={() => void refetch()} /> : null}
         renderItem={({ item }: { item: Row }) =>
           isOfflineRow(item) ? (
             <OfflineRowView row={item} />
           ) : item.type === 'banner' ? (
             <Banner kind={item.kind} />
+          ) : item.type === 'quick' && item.signedIn ? (
+            <QuickPages items={item.items} />
+          ) : item.type === 'supermix' ? (
+            <SupermixButton playlist={item.playlist} />
           ) : item.type === 'quick' ? (
             <View style={styles.grid}>
               {item.items.map((it) => (

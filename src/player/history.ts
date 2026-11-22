@@ -65,3 +65,24 @@ export function recentArtists(tracks: Track[]): { id: string; name: string; artw
 export function getPlays(days = 30, now = Date.now()) {
   return playsSince(getDb(), now - days * 86_400_000);
 }
+
+/**
+ * Home / History list for a signed-in account: this device's 5 newest plays first (it knows they are newest), then the rest
+ * of the account's history and this device's, interleaved remote first. Deduped by id, capped. Songs from this phone stay.
+ */
+export function mergeHistory(local: Track[], remote: Track[], max = HISTORY_LIMIT): Track[] {
+  const out: Track[] = [];
+  const seen = new Set<string>();
+  const add = (t: Track | undefined) => {
+    if (!t || seen.has(t.id) || out.length >= max) return;
+    seen.add(t.id);
+    out.push(t);
+  };
+  local.slice(0, 5).forEach(add);
+  const restLocal = local.slice(5);
+  for (let i = 0; i < Math.max(remote.length, restLocal.length); i++) {
+    add(remote[i]);
+    add(restLocal[i]);
+  }
+  return out;
+}

@@ -1,13 +1,15 @@
 import { keepPreviousData, useInfiniteQuery, useQueries, useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
+import { useAuth } from '../auth/store';
 import { logWarn } from '../util/log';
+import { queryClient } from './queryClient';
 import { contentLocale } from './contentLocale';
 import { homeCache } from './homeCache';
 import { latestReleases } from '../home/personalize';
 import { moodShelf } from '../home/discover';
-import { FALLBACK_MOODS, getAlbum, getCharts, getExplore, homeMorePage, type Mood, getUpNext, regionFromLocale, getArtist, getHome, getMoodPage, getMoods, getPlaylist, getSearchSuggestions, search, searchAll } from './api';
+import { FALLBACK_MOODS, getAlbum, getCharts, getExplore, homeMorePage, type Mood, getUpNext, regionFromLocale, getArtist, getHome, getMoodPage, getMoods, getRecap, getRecapTracks, getYtHistory, getPlaylist, getSearchSuggestions, search, searchAll } from './api';
 import type { Album, Artist, MusicItem, Page, SearchType, Shelf, Track } from './models';
 
 /** Flattens a lazily-paged result into useInfiniteQuery plumbing. */
@@ -154,3 +156,25 @@ export function useFollowedReleases(artists: Artist[], max = 8): { releases: Alb
   });
   return { releases: results.map((r) => r.data ?? []), loading: results.some((r) => r.isLoading) };
 }
+
+/** The account's play history across devices (signed in only). */
+export const useYtHistory = () => {
+  const signedIn = useAuth((s) => s.status === 'signedIn');
+  const r = useQuery({ queryKey: ['yt', 'history'], queryFn: getYtHistory, staleTime: 5 * 60_000, enabled: signedIn });
+  // Back from the background: pick up plays from other devices (a fresh result within staleTime is kept).
+  useEffect(() => {
+    if (!signedIn) return;
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') void queryClient.invalidateQueries({ queryKey: ['yt', 'history'], refetchType: 'active' });
+    });
+    return () => sub.remove();
+  }, [signedIn]);
+  return r;
+};
+
+export const useRecap = () => {
+  const signedIn = useAuth((s) => s.status === 'signedIn');
+  return useQuery({ queryKey: ['yt', 'recap'], queryFn: getRecap, staleTime: 60 * 60_000, enabled: signedIn });
+};
+
+export { getRecapTracks };

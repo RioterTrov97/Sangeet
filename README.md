@@ -67,7 +67,7 @@ no analytics and no tracking.
 
 | App | Status | Notes |
 | --- | --- | --- |
-| **Android TV** | Ready | Full D-pad interface, built for the Google TV Streamer, with in-app updates. Controlled from either phone over the local network (discovery, playback and state mirroring). See [docs/INSTALL-TV.md](./docs/INSTALL-TV.md). |
+| **Android TV** | Ready | Full D-pad interface, built for the Google TV Streamer, with in-app updates. Controlled from either phone over the local network (discovery, playback and state mirroring). Install it with the Downloader app (by AFTVnews) using code **`5597951`**; see [docs/INSTALL-TV.md](./docs/INSTALL-TV.md). |
 | **Apple TV** | Not planned | |
 
 ### Services

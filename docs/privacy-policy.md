@@ -16,7 +16,7 @@ Sangeet is a music player for iPhone. This page says what the app stores on your
 
 The app talks to the services that provide the music and the extras you ask for. Those services see your IP address and the request itself, as with any web request, and they have their own privacy policies.
 
-- **YouTube Music and Google**: searches, browsing, stream requests and, if you are signed in, your library, recommendations and the playback and like actions you make. This is the app's main function.
+- **YouTube Music and Google**: searches, browsing, stream requests and, if you are signed in, your library, recommendations and the playback and like actions you make. While you are signed in, songs you play are added to your YouTube history so YouTube Music can tune its recommendations; you can turn this off in Settings. This is the app's main function.
 - **Lyrics providers**: when you open lyrics, the song title, artist and length are sent to lyrics services (LRCLIB, lrc.red, NetEase Cloud Music) to look up lyrics, as well as to YouTube Music. You can turn each source off in Settings.
 - **Spotify playlist import**: if you paste a public Spotify playlist or album link, the app fetches that public page from Spotify to read the track list, then matches the tracks on YouTube Music. Nothing is sent to your Spotify account.
 - **Backup server (optional)**: if you add your own backup stream server in Settings, the app sends it the song it needs to resolve, with the access token you set. That server is run by you, not by Sangeet.

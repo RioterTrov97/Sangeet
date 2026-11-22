@@ -23,6 +23,7 @@ export function isMusicUrl(url: string): boolean {
 const SAFE_NAME = /^[A-Za-z0-9!#$%&'*+\-.^_`|~]+$/;
 const SAFE_VALUE = /^[\x21\x23-\x2B\x2D-\x3A\x3C-\x5B\x5D-\x7E]*$/;
 
+/** Later maps win on a name clash: pass the YouTube cookies last (Google's SID / SAPISID values are not valid on YouTube). */
 export function mergeCookies(...maps: CookieMap[]): CookieMap {
   return Object.assign({}, ...maps);
 }
