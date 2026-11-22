@@ -86,7 +86,7 @@ Versions come from changesets (see "Building a feature"). Three GitHub workflows
 | --- | --- | --- |
 | `.github/workflows/checks.yml` | every PR and push to `main` | tsc, eslint, jest; on PRs, a warning (never a failure) when app code changes without a changeset; no secrets |
 | `.github/workflows/version.yml` | push to `main`, or by hand | pending changesets → one growing `Release vX.Y.Z` PR on `changeset-release/main` (package.json version, CHANGELOG.md, lockfile); never builds. Fails on purpose, without bumping, while main's version has no tag but an earlier release does (a failed release) |
-| `.github/workflows/release.yml` | the owner merging that PR, or the owner by hand on `main` | gates → iOS (`adhoc` to Firebase App Distribution, or `beta` to TestFlight) and the signed Android APK (`android` job: one universal APK for phones and TV, published as `sangeet-android-vX.Y.Z.apk`) → GitHub Release `vX.Y.Z` with the notes and APK. Manual `dry_run` builds and signs both apps (iOS `build_only` lane) and sends nothing |
+| `.github/workflows/release.yml` | the push to `main` that merges that PR (verified through the API), or the owner by hand on `main` | gates → iOS (`adhoc` to Firebase App Distribution, or `beta` to TestFlight) and the signed Android APK (`android` job: one universal APK for phones and TV, published as `sangeet-android-vX.Y.Z.apk`) → GitHub Release `vX.Y.Z` with the notes and APK. Manual `dry_run` builds and signs both apps (iOS `build_only` lane) and sends nothing |
 
 Pieces: `fastlane/Fastfile` (lanes `adhoc`, `beta`, `build_only`, `metadata`, `certs`), `scripts/testflight.sh`
 (the same lanes from a Mac), `scripts/android-tv-release.sh` (the universal Android APK, `dist/sangeet-tv.apk`), `scripts/release-notes.mjs` (CHANGELOG section),
@@ -108,12 +108,14 @@ GitHub Releases. Agents can read run results (`gh run list`, `gh run view <id>`)
 Release run, approve the `release` environment or merge the release PR; those are the developer's.
 
 Rules for changing CI:
-- **Nothing deploys on its own.** Release runs only on `workflow_dispatch` (owner, `main`) or on the merge of the
-  release PR (`pull_request: closed`, guarded: merged, head `changeset-release/main` from this repo, merged by the owner;
-  it checks out `merge_commit_sha`). Never add a push, tag, schedule or other pull_request trigger to a workflow that
-  signs, uploads or publishes, and never loosen that guard. Jobs that read signing or upload secrets use
-  `environment: release`. Checks and Version must never receive secrets or sign anything. Workflows get the least
-  `permissions` they need (`contents: read` by default).
+- **Nothing deploys on its own.** Release runs only on `workflow_dispatch` (owner, `main`) or on the push to `main` that
+  merges the release PR. Its prepare job lets that push through only when the GitHub API says the commit is the merge of
+  a PR from `changeset-release/main` in this repo, merged by the owner; every other push ends there with nothing built.
+  It must stay a push-to-`main` trigger: a `pull_request` run belongs to `refs/pull/N/merge`, which the main-only
+  `release` environment refuses. Never add a tag, schedule or pull_request trigger to a workflow that signs, uploads or
+  publishes, never let another push through, and never loosen these guards. Jobs that read signing or upload secrets use
+  `environment: release` (deployments limited to `main`). Checks and Version must never receive secrets or sign
+  anything. Workflows get the least `permissions` they need (`contents: read` by default).
 - **The repo is public, so Actions logs and artifacts are public.** Run every build or upload command through
   `scripts/ci-run.sh <name> <cmd>` (full output to a file; the log shows only summary and scrubbed error lines). Never
   `cat`, `echo` or `set -x` anything that could hold a secret, a tester's email or device, the bundle ID or team, and

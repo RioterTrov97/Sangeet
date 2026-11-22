@@ -1,6 +1,9 @@
 # Ships the version in package.json. Runs only when (a) the owner merges the release PR (branch changeset-release/main,
 # kept up to date by the Version workflow), or (b) the owner starts it by hand: Actions > Release > Run workflow, on main.
-# Nothing else deploys. Steps: gates, iOS build to Firebase App Distribution (or TestFlight), signed Android APK (one
+# Nothing else deploys. (a) listens to pushes to main, not to the pull_request event: a pull_request run belongs to
+# refs/pull/N/merge, which the main-only "release" environment rightly refuses. The prepare job lets a push through only
+# when GitHub's API says the pushed commit is the merge of the release PR from this repo, merged by the owner; every
+# other push to main ends there, with nothing built. Steps: gates, iOS build to Firebase App Distribution (or TestFlight), signed Android APK (one
 # universal APK: Android phones and Android TV), then a GitHub Release v<version> with the CHANGELOG notes and the APK attached.
 # A merged release PR uses the defaults: iOS adhoc, Android on, gates on, latest stable Xcode.
 # dry_run (manual only) builds and signs everything but sends nothing: iOS runs the build_only lane (App Store signing,
@@ -28,8 +31,7 @@
 name: Release
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -69,16 +71,22 @@ env:
 
 jobs:
   prepare:
-    # Manual run on main by the owner, or the owner merging the release PR from this repository (never a fork).
+    # Manual run on main by the owner, or a push to main by the owner that looks like a release PR merge (merge, squash
+    # or rebase message). The first step then checks the PR itself; this cheap filter only keeps other pushes quiet.
     if: >-
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == github.repository_owner) ||
-      (github.event_name == 'pull_request' && github.event.pull_request.merged == true &&
-       github.event.pull_request.head.ref == 'changeset-release/main' &&
-       github.event.pull_request.head.repo.full_name == github.repository &&
-       github.event.pull_request.merged_by.login == github.repository_owner)
+      github.ref == 'refs/heads/main' && github.actor == github.repository_owner &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'push' &&
+        (contains(github.event.head_commit.message, 'changeset-release/main') ||
+         startsWith(github.event.head_commit.message, 'Release v') ||
+         startsWith(github.event.head_commit.message, 'release: v'))))
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
+      go: ${{ steps.pr.outputs.go }}
       version: ${{ steps.v.outputs.version }}
       sha: ${{ steps.v.outputs.sha }}
       ios: ${{ steps.v.outputs.ios }}
@@ -86,17 +94,33 @@ jobs:
       xcode: ${{ steps.v.outputs.xcode }}
       dry_run: ${{ steps.v.outputs.dry_run }}
     env:
-      # The merge commit on main for a merged PR; the main tip for a manual run.
-      SHA: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+      SHA: ${{ github.sha }}
+      GH_TOKEN: ${{ github.token }}
       IN_IOS: ${{ inputs.ios || 'adhoc' }}
-      IN_ANDROID: ${{ github.event_name == 'pull_request' || inputs.android }}
+      IN_ANDROID: ${{ github.event_name == 'push' || inputs.android }}
       IN_XCODE: ${{ inputs.xcode || 'latest-stable' }}
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
     steps:
+      - id: pr
+        name: Release PR merge?
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then echo "go=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          # The PR this commit came from: release branch, from this repo (never a fork), merged into main.
+          n=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/pulls" --jq '[.[] | select(.head.ref == "changeset-release/main"
+                and .head.repo.full_name == env.GITHUB_REPOSITORY and .base.ref == "main" and .merged_at != null)][0].number // empty')
+          by=""; [ -z "$n" ] || by=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$n" --jq '.merged_by.login')
+          if [ -n "$n" ] && [ "$by" = "$GITHUB_REPOSITORY_OWNER" ]; then
+            echo "go=true" >> "$GITHUB_OUTPUT"; echo "Release PR #$n merged" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Not a release PR merge by the owner: nothing to release."
+          fi
       - uses: actions/checkout@v7
+        if: steps.pr.outputs.go == 'true'
         with:
           ref: ${{ env.SHA }}
       - id: v
+        if: steps.pr.outputs.go == 'true'
         name: Version, tag and changesets
         run: |
           v=$(node -p "require('./package.json').version")
@@ -113,11 +137,11 @@ jobs:
           node scripts/release-notes.mjs "$v" > /dev/null || { echo "::error::CHANGELOG.md has no ## $v section"; exit 1; }
           [ -n "$SANGEET_BUNDLE_ID" ] || { echo "::error::Missing repository secret SANGEET_BUNDLE_ID"; exit 1; }
           what="Releasing"; [ "$DRY_RUN" = true ] && what="Dry run (nothing is sent)"
-          echo "$what **v$v** (${{ github.event_name == 'pull_request' && 'release PR merged' || 'manual run' }}): iOS \`$IN_IOS\`, Android \`$IN_ANDROID\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "$what **v$v** (${{ github.event_name == 'push' && 'release PR merged' || 'manual run' }}): iOS \`$IN_IOS\`, Android \`$IN_ANDROID\`" >> "$GITHUB_STEP_SUMMARY"
 
   gates:
     needs: prepare
-    if: ${{ !inputs.skip_gates }}
+    if: ${{ needs.prepare.outputs.go == 'true' && !inputs.skip_gates }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -135,7 +159,7 @@ jobs:
 
   ios:
     needs: [prepare, gates]
-    if: ${{ !cancelled() && needs.prepare.result == 'success' && (needs.gates.result == 'success' || needs.gates.result == 'skipped') && needs.prepare.outputs.ios != 'skip' }}
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && needs.prepare.outputs.go == 'true' && (needs.gates.result == 'success' || needs.gates.result == 'skipped') && needs.prepare.outputs.ios != 'skip' }}
     runs-on: macos-26
     environment: release
     timeout-minutes: 120
@@ -245,7 +269,7 @@ jobs:
 
   android:
     needs: [prepare, gates]
-    if: ${{ !cancelled() && needs.prepare.result == 'success' && (needs.gates.result == 'success' || needs.gates.result == 'skipped') && needs.prepare.outputs.android == 'true' }}
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && needs.prepare.outputs.go == 'true' && (needs.gates.result == 'success' || needs.gates.result == 'skipped') && needs.prepare.outputs.android == 'true' }}
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 90
